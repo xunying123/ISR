@@ -1,107 +1,99 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
-// 顶点着色器源码
-const char* vertexShaderSource = R"(
-    #version 330 core
-    layout (location = 0) in vec3 aPos;
-    void main()
-    {
-        gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+std::string loadShaderSource(const char* filepath) {
+    std::ifstream file(filepath);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+GLuint compileShader(GLenum type, const char* source) {
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+
+    GLint success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cerr << "ERROR::SHADER_COMPILATION_FAILED\n" << infoLog << std::endl;
     }
-)";
 
-// 片段着色器源码
-const char* fragmentShaderSource = R"(
-    #version 330 core
-    out vec4 FragColor;
-    void main()
-    {
-        FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    return shader;
+}
+
+int main() {
+
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW\n";
+        return -1;
     }
-)";
 
-int main()
-{
-    // 初始化GLFW
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    // 创建一个窗口对象
-    GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
+    GLFWwindow* window = glfwCreateWindow(800, 600, "Ray Marching", nullptr, nullptr);
+    if (!window) {
+        std::cerr << "Failed to create window\n";
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
 
-    // 初始化GLAD
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cerr << "Failed to initialize GLAD\n";
         return -1;
     }
 
-    // 编译顶点着色器
-    unsigned int vertexShader;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
+    float vertices[] = {
+        -1.0f, -1.0f,
+         1.0f, -1.0f,
+        -1.0f,  1.0f,
+         1.0f,  1.0f,
+    };
 
-    // 编译片段着色器
-    unsigned int fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
+    GLuint VAO, VBO;
+    glGenVertexArrays(1, &VAO); glBindVertexArray(VAO);
+    glGenBuffers(1, &VBO); glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    // 链接着色器程序
-    unsigned int shaderProgram;
-    shaderProgram = glCreateProgram();
+    std::string vertSource = loadShaderSource("./shaders/raymarch.vert");
+    std::string fragSource = loadShaderSource("./shaders/raymarch.frag");
+
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertSource.c_str());
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSource.c_str());
+
+    GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
+    glUseProgram(shaderProgram);
 
-    // 删除着色器
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // 设置顶点数据（这里我们只绘制一个三角形）
-    float vertices[] = {
-            0.5f,  0.5f, 0.0f,  // 右上角
-            0.5f, -0.5f, 0.0f,  // 右下角
-            -0.5f, -0.5f, 0.0f,  // 左下角
-    };
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // 渲染循环
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)) {
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
+
         glUseProgram(shaderProgram);
+        glUniform2f(glGetUniformLocation(shaderProgram, "iResolution"), width, height);
+        glUniform1f(glGetUniformLocation(shaderProgram, "iTime"), glfwGetTime());
+
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // 清理资源
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteProgram(shaderProgram);
-
-    // 终止GLFW
     glfwTerminate();
     return 0;
 }
