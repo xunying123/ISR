@@ -1,14 +1,14 @@
-#include "Objects.h"
+#include "objects.h"
 
-std::vector<float> Objects::Object::packObjectToTextureData(const Objects::Object &obj) {
+std::vector<float> Objects::Object::packObjectToTextureData() {
     std::vector<float> textureData(32);
-    textureData[0] = static_cast<float>(obj.type); // type
-    textureData[1] = obj.color.r; // R
-    textureData[2] = obj.color.g; // G
-    textureData[3] = obj.color.b; // B
-    textureData[4] = obj.color.a; // A
+    textureData[0] = static_cast<float>(type); // type
+    textureData[1] = color.r; // R
+    textureData[2] = color.g; // G
+    textureData[3] = color.b; // B
+    textureData[4] = color.a; // A
     for (int i = 0; i < 12; ++i) {
-        textureData[5 + i] = obj.pos_args[i];
+        textureData[5 + i] = pos_args[i];
     }
     return textureData;
 }

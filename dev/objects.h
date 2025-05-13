@@ -19,11 +19,11 @@ namespace Objects {
     };
 
     struct Object {
-        const Object_type type;
-        const Color color;
+        Object_type type;
+        Color color;
         float pos_args[12];
 
-        std::vector<float> packObjectToTextureData(const Object &obj);
+        std::vector<float> packObjectToTextureData();
     };
 
     Object create_sphere(glm::vec3 center, Color color, float radius);
