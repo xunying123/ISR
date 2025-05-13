@@ -1,34 +1,38 @@
 #version 330 core
-
 out vec4 FragColor;
 in vec2 fragCoord;
-
 uniform vec2 iResolution;
 uniform float iTime;
 
-// 距离函数（SDF）：单位球体
+int materialID = 0;
+
 float sdfSphere(vec3 p, float r) {
     return length(p) - r;
 }
 
-// 场景中的物体
+float sdfBox(vec3 p, vec3 b) {
+    vec3 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
 float map(vec3 p) {
-    return sdfSphere(p - vec3(0.0, 0.0, 3.0), 1.0);
+    float d1 = sdfSphere(p - vec3(-1.5, 0.0, 3.0), 1.0);
+    float d2 = sdfBox(p - vec3(1.5, 0.0, 3.0), vec3(0.7));
+    float minD = d1;
+    materialID = 1;
+    if (d2 < minD) { minD = d2; materialID = 2; }
+    return minD;
 }
 
-// 法线估计
-vec3 getNormal(vec3 p) {
+vec3 estimateNormal(vec3 p) {
     float h = 0.001;
-    vec2 k = vec2(1, -1);
-    return normalize(
-        k.xyy * map(p + k.xyy * h) +
-        k.yyx * map(p + k.yyx * h) +
-        k.yxy * map(p + k.yxy * h) +
-        k.xxx * map(p + k.xxx * h)
-    );
+    return normalize(vec3(
+        map(p + vec3(h, 0, 0)) - map(p - vec3(h, 0, 0)),
+        map(p + vec3(0, h, 0)) - map(p - vec3(0, h, 0)),
+        map(p + vec3(0, 0, h)) - map(p - vec3(0, 0, h))
+    ));
 }
 
-// 光线步进
 float rayMarch(vec3 ro, vec3 rd) {
     float t = 0.0;
     for (int i = 0; i < 100; i++) {
@@ -38,24 +42,26 @@ float rayMarch(vec3 ro, vec3 rd) {
         t += d;
         if (t > 100.0) break;
     }
+    materialID = 0;
     return -1.0;
 }
 
 void main() {
-    // 将屏幕坐标归一化为 [-1, 1]
-    vec2 uv = (fragCoord / iResolution) * 2.0 - 1.0;
+    vec2 uv = fragCoord * 0.5 + 0.5;
+    uv = uv * 2.0 - 1.0;
     uv.x *= iResolution.x / iResolution.y;
 
-    vec3 ro = vec3(0.0, 0.0, -5.0);          // 相机位置
-    vec3 rd = normalize(vec3(uv, 1.0));      // 光线方向
+    vec3 ro = vec3(0.0, 0.0, -5.0);
+    vec3 rd = normalize(vec3(uv, 1.0));
 
     float t = rayMarch(ro, rd);
     if (t > 0.0) {
-        vec3 p = ro + rd * t;
-        vec3 n = getNormal(p);
+        vec3 p = ro + t * rd;
+        vec3 n = estimateNormal(p);
         vec3 lightDir = normalize(vec3(1.0, 1.0, -1.0));
         float diff = max(dot(n, lightDir), 0.0);
-        FragColor = vec4(vec3(diff), 1.0);
+        vec3 color = (materialID == 1) ? vec3(1, 0.3, 0.3) : vec3(0.3, 0.3, 1.0);
+        FragColor = vec4(color * diff, 1.0);
     } else {
         FragColor = vec4(0.0);
     }
