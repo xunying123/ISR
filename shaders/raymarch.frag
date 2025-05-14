@@ -17,7 +17,7 @@ float sdBox(vec3 p, vec3 b)
     vec3 q = abs(p) - b;
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
-/* ——— Capsule（圆柱核心）——— */
+
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
 {
     vec3 pa = p - a,  ba = b - a;
@@ -25,30 +25,37 @@ float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
     return length(pa - ba*h) - r;
 }
 
-/* ——— 圆柱（带平面端盖）——— */
 float sdCylinderFlat(vec3 p, vec3 a, vec3 b, float r)
 {
-    /* 1) 预处理轴向基向量 */
     vec3  ba   = b - a;
-    float h2   = length(ba) * 0.5;        // 半高
-    vec3  axis = ba / (h2 * 2.0);         // 单位向量
-    vec3  mid  = (a + b) * 0.5;           // 圆柱中心
+    float h2   = length(ba) * 0.5;        
+    vec3  axis = ba / (h2 * 2.0);         
+    vec3  mid  = (a + b) * 0.5;           
 
-    /* 2) 构造正交基 (x,y 组成横截面平面，z 为轴) */
     vec3 up  = abs(axis.z) < 0.999 ? vec3(0,0,1) : vec3(1,0,0);
     vec3 x   = normalize(cross(up, axis));
     vec3 y   = cross(axis, x);
 
-    /* 3) 把 p 映射到该局部坐标 */
     vec3 lp = vec3(dot(p - mid, x),
                    dot(p - mid, y),
                    dot(p - mid, axis));     // lp.z ∈ [-h2, h2]
 
-    /* 4) 经典 2D SDF 公式 */
     vec2 d = abs(vec2(length(lp.xy), lp.z)) - vec2(r, h2);
     return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
 }
 
+float sdCone(vec3 p, vec2 c, float h)
+{
+    vec2 q = h * vec2(c.x / c.y, -1.0);
+        
+    vec2 w = vec2(length(p.xz), p.y);
+    vec2 a = w - q * clamp(dot(w,q) / dot(q,q), 0.0, 1.0);
+    vec2 b = w - q * vec2(clamp(w.x / q.x, 0.0, 1.0), 1.0);
+    float k = sign(q.y);
+    float d = min(dot(a, a), dot(b, b));
+    float s = max(k * (w.x * q.y - w.y * q.x), k * (w.y - q.y));
+    return sqrt(d) * sign(s);
+}
 
 float distOne(int idx, vec3 p, out vec3 objColor)
 {
@@ -69,6 +76,29 @@ float distOne(int idx, vec3 p, out vec3 objColor)
         vec3 center = t1.yzw;           // (pos0~2)
         float radius = t2.x;            // (pos3)
         return sdSphere(p - center, radius);
+    }
+    else if (type == 1)               /* ------------ CONE -------------*/
+    {
+        vec3 center = t1.yzw;           // (pos0~2)
+        vec3 vertex = t2.xyz;           // (pos3~5)
+        float radius = t2.w;            // (pos6)
+
+        vec3 axis = normalize(center - vertex);   
+        float height = length(center - vertex);   
+
+        vec3 up = abs(axis.y) < 0.999 ? vec3(0,1,0) : vec3(1,0,0);
+        vec3 x  = normalize(cross(up, axis));
+        vec3 z  = cross(axis, x);
+
+        mat3 basis = mat3(x, -axis, z);
+
+        vec3 p_local = transpose(basis) * (p - vertex);
+
+        float angle = atan(radius, height);      
+        vec2  c     = vec2(sin(angle), cos(angle));
+
+        return sdCone(p_local, c, height);
+
     }
     else if (type == 2)               /* ---------- CYLINDER ---------- */
     {
