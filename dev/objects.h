@@ -30,7 +30,7 @@ namespace Objects {
 
     Object create_cone(glm::vec3 center, Color color, glm::vec3 vertex, float radius);
 
-    Object create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius, float height);
+    Object create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius);
 
     Object create_cuboid(glm::vec3 vertex, Color color, float length, float width, float height);
 

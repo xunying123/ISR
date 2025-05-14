@@ -17,6 +17,38 @@ float sdBox(vec3 p, vec3 b)
     vec3 q = abs(p) - b;
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
+/* ——— Capsule（圆柱核心）——— */
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 pa = p - a,  ba = b - a;
+    float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0);
+    return length(pa - ba*h) - r;
+}
+
+/* ——— 圆柱（带平面端盖）——— */
+float sdCylinderFlat(vec3 p, vec3 a, vec3 b, float r)
+{
+    /* 1) 预处理轴向基向量 */
+    vec3  ba   = b - a;
+    float h2   = length(ba) * 0.5;        // 半高
+    vec3  axis = ba / (h2 * 2.0);         // 单位向量
+    vec3  mid  = (a + b) * 0.5;           // 圆柱中心
+
+    /* 2) 构造正交基 (x,y 组成横截面平面，z 为轴) */
+    vec3 up  = abs(axis.z) < 0.999 ? vec3(0,0,1) : vec3(1,0,0);
+    vec3 x   = normalize(cross(up, axis));
+    vec3 y   = cross(axis, x);
+
+    /* 3) 把 p 映射到该局部坐标 */
+    vec3 lp = vec3(dot(p - mid, x),
+                   dot(p - mid, y),
+                   dot(p - mid, axis));     // lp.z ∈ [-h2, h2]
+
+    /* 4) 经典 2D SDF 公式 */
+    vec2 d = abs(vec2(length(lp.xy), lp.z)) - vec2(r, h2);
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
 
 float distOne(int idx, vec3 p, out vec3 objColor)
 {
@@ -27,6 +59,7 @@ float distOne(int idx, vec3 p, out vec3 objColor)
     vec4 t1 = texelFetch(objectBuffer, base + 1);   // A + pos0~2
     vec4 t2 = texelFetch(objectBuffer, base + 2);   // pos3~6
     vec4 t3 = texelFetch(objectBuffer, base + 3);   // pos7~10
+    vec4 t4 = texelFetch(objectBuffer, base + 4);
 
     int  type = int(t0.x + 0.5);
     objColor  = t0.yzw;                 // 颜色 rgb
@@ -37,12 +70,20 @@ float distOne(int idx, vec3 p, out vec3 objColor)
         float radius = t2.x;            // (pos3)
         return sdSphere(p - center, radius);
     }
+    else if (type == 2)               /* ---------- CYLINDER ---------- */
+    {
+        vec3 a       = t1.yzw;                    // 端点 A
+        vec3 b       = t2.xyz;                    // 端点 B
+        float radius = t2.w;                      // 半径 (pos3)
+        return sdCylinderFlat(p, a, b, radius);
+    }
     else if (type == 3)                 /* ---------- CUBOID ---------- */
     {
         vec3 center   = t1.yzw;                     // (pos0~2)
         vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5; // 长宽高一半
         return sdBox(p - center, halfExt);
     }
+
     /* TODO：圆锥、圆柱、四面体…… */
     return 1e6;                         // 默认返回“很远”
 }

@@ -87,15 +87,8 @@ int main()
     /* ---------- 4. 在 CPU 端创建任意数量的物体 ---------- */
     using namespace Objects;
     std::vector<Object> cpuObjs;
-    cpuObjs.push_back(create_sphere(glm::vec3(0.0f,0.0f,0.0f),
-                                    {0,0.3f,0.3f,1},            // 红球
-                                    1.0f));
-
-    cpuObjs.push_back(create_cuboid(glm::vec3(-2.0f,0.5f,0.0f),
-                                    {0.2f,0.8f,0.2f,1},         // 绿盒
-                                    0.5f, 0.5f, 0.5f));
-
-    // 你可以随时 push_back / erase 再重新上传
+    cpuObjs.push_back(create_tetrahedron({0,0,1}, {0.2,1,0.2,1},
+                                        {1,0,1}, {1,1,1}, {0,0,2})); // 紫色
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;

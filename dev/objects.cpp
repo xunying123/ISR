@@ -21,8 +21,8 @@ Objects::Object Objects::create_cone(glm::vec3 center, Color color, glm::vec3 ve
     return Object{CONE, color, {center.x, center.y, center.z, vertex.x, vertex.y, vertex.z, radius}};
 }
 
-Objects::Object Objects::create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius, float height) {
-    return Object{CYLINDER, color, {center1.x, center1.y, center1.z, center2.x, center2.y, center2.z, radius, height}};
+Objects::Object Objects::create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius) {
+    return Object{CYLINDER, color, {center1.x, center1.y, center1.z, center2.x, center2.y, center2.z, radius}};
 }
 
 Objects::Object Objects::create_cuboid(glm::vec3 vertex, Color color, float length, float width, float height) {
