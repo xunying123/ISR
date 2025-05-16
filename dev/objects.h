@@ -32,7 +32,7 @@ namespace Objects {
 
     Object create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius);
 
-    Object create_cuboid(glm::vec3 vertex, Color color, float length, float width, float height);
+    Object create_cuboid(glm::vec3 center, Color color, float length, float width, float height);
 
     Object create_tetrahedron(glm::vec3 vertex1, Color color, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4);
 

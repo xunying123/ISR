@@ -25,8 +25,8 @@ Objects::Object Objects::create_cylinder(glm::vec3 center1, Color color, glm::ve
     return Object{CYLINDER, color, {center1.x, center1.y, center1.z, center2.x, center2.y, center2.z, radius}};
 }
 
-Objects::Object Objects::create_cuboid(glm::vec3 vertex, Color color, float length, float width, float height) {
-    return Object{CUBOID, color, {vertex.x, vertex.y, vertex.z, length, width, height}};
+Objects::Object Objects::create_cuboid(glm::vec3 center, Color color, float length, float width, float height) {
+    return Object{CUBOID, color, {center.x, center.y, center.z, length, width, height}};
 }
 
 Objects::Object Objects::create_tetrahedron(glm::vec3 vertex1, Color color, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4) {

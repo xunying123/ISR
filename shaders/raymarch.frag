@@ -57,9 +57,58 @@ float sdCone(vec3 p, vec2 c, float h)
     return sqrt(d) * sign(s);
 }
 
+float sqrLength(vec3 v) {
+    return dot(v, v);
+}
+
+float sdTriangle(vec3 p, vec3 a, vec3 b, vec3 c) {
+    vec3 ba = b - a; vec3 pa = p - a;
+    vec3 cb = c - b; vec3 pb = p - b;
+    vec3 ac = a - c; vec3 pc = p - c;
+    vec3 nor = cross(ba, ac);
+
+    return sqrt(
+        min(min(
+            sqrLength(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)),
+            sqrLength(pb - cb * clamp(dot(pb, cb) / dot(cb, cb), 0.0, 1.0))),
+            sqrLength(pc - ac * clamp(dot(pc, ac) / dot(ac, ac), 0.0, 1.0)))
+    + (dot(nor, pa) * dot(nor, pa)) / dot(nor, nor));
+}
+
+float sdTetrahedron(vec3 p, vec3 v0, vec3 v1, vec3 v2, vec3 v3)
+{
+    vec3 cen = (v0+v1+v2+v3)*0.25;       
+
+    vec3 n0 = normalize(cross(v1-v0, v2-v0));
+    if(dot(cen - v0, n0) > 0.0) n0 = -n0; 
+
+    vec3 n1 = normalize(cross(v2-v0, v3-v0));
+    if(dot(cen - v0, n1) > 0.0) n1 = -n1;
+
+    vec3 n2 = normalize(cross(v3-v0, v1-v0));
+    if(dot(cen - v0, n2) > 0.0) n2 = -n2;
+
+    vec3 n3 = normalize(cross(v1-v2, v3-v2));
+    if(dot(cen - v2, n3) > 0.0) n3 = -n3;
+
+    float d0 = dot(p - v0, n0);
+    float d1 = dot(p - v0, n1);
+    float d2 = dot(p - v0, n2);
+    float d3 = dot(p - v2, n3);
+
+    if(d0<=0.0 && d1<=0.0 && d2<=0.0 && d3<=0.0)
+        return max(max(d0, max(d1,d2)), d3);
+
+    float dist0 = sdTriangle(p, v0, v1, v2);
+    float dist1 = sdTriangle(p, v0, v2, v3);
+    float dist2 = sdTriangle(p, v0, v3, v1);
+    float dist3 = sdTriangle(p, v1, v2, v3);
+    return min(min(dist0, dist1), min(dist2, dist3));
+}
+
 float distOne(int idx, vec3 p, out vec3 objColor)
 {
-    const int STRIDE = 8;               // 每个物体 8 × vec4
+    const int STRIDE = 8;               // 8 × vec4
     int base = idx * STRIDE;  
 
     vec4 t0 = texelFetch(objectBuffer, base + 0);   // type & RGB
@@ -69,7 +118,7 @@ float distOne(int idx, vec3 p, out vec3 objColor)
     vec4 t4 = texelFetch(objectBuffer, base + 4);
 
     int  type = int(t0.x + 0.5);
-    objColor  = t0.yzw;                 // 颜色 rgb
+    objColor  = t0.yzw;                 // rgb
 
     if (type == 0)                      /* ---------- SPHERE ---------- */
     {
@@ -102,23 +151,28 @@ float distOne(int idx, vec3 p, out vec3 objColor)
     }
     else if (type == 2)               /* ---------- CYLINDER ---------- */
     {
-        vec3 a       = t1.yzw;                    // 端点 A
-        vec3 b       = t2.xyz;                    // 端点 B
-        float radius = t2.w;                      // 半径 (pos3)
+        vec3 a       = t1.yzw;                    
+        vec3 b       = t2.xyz;                    
+        float radius = t2.w;                      
         return sdCylinderFlat(p, a, b, radius);
     }
     else if (type == 3)                 /* ---------- CUBOID ---------- */
     {
         vec3 center   = t1.yzw;                     // (pos0~2)
-        vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5; // 长宽高一半
+        vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5; 
         return sdBox(p - center, halfExt);
     }
+    else if (type == 4)                 /* ---------- Tetrahedron ---------- */
+    {
+        vec3 v0 = t1.yzw;                     // (pos0~2)
+        vec3 v1 = t2.xyz;                     // (pos3~5)
+        vec3 v2 = vec3(t2.w, t3.x, t3.y); // (pos6~8)
+        vec3 v3 = vec3(t3.z, t3.w, t4.x); // (pos9~11)
+        return sdTetrahedron(p, v0, v1, v2, v3);
+    }
+    return 1e6;     
+}                   
 
-    /* TODO：圆锥、圆柱、四面体…… */
-    return 1e6;                         // 默认返回“很远”
-}
-
-/* ======== 场景距离 + 最近物体颜色 ======== */
 float map(vec3 p, out vec3 col)
 {
     float dMin = 1e9;
@@ -158,37 +212,59 @@ float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
     {
         pos = ro + rd * t;
         float d = map(pos, col);
-        if (d < EPS) return t;          // 命中
+        if (d < EPS) return t;          // hit
         t += d;
-        if (t > TMAX) break;            // 射线飞出远裁剪
+        if (t > TMAX) break;            // clipped
     }
-    return -1.0;                        // 未命中
+    return -1.0;                       
 }
 
-/* ======== 主函数 ======== */
 void main()
 {
-    /* 1) 构造相机光线（简单透视） */
+    /* 1) Ray */
     vec2 uv = (fragCoord * 2.0 - 1.0);
     uv.x *= iResolution.x / iResolution.y;
 
-    vec3 ro = vec3(0.0, 0.0, -6.0);     // 相机位置
-    vec3 rd = normalize(vec3(uv, 1.5)); // 视线方向
+    vec3 ro = vec3(0.0, 0.0, -5.0);     // camera pos
+    vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
 
     /* 2) Ray March */
     vec3 hitPos, baseCol;
     float t = march(ro, rd, hitPos, baseCol);
-    if (t < 0.0)                        // 没打到任何物体 → 背景
+    if (t < 0.0)                        // background
     {
         FragColor = vec4(0.0);
         return;
     }
 
-    /* 3) 光照 (简单 Diffuse) */
+    /* ---------- 3) Light ------------------------------------------------ */
     vec3 n = calcNormal(hitPos);
-    vec3 lightDir = normalize(vec3(0.0, 0.0, -0.4));
-    float diff = max(dot(n, lightDir), 0.0);
-    vec3 color = baseCol * diff + 0.25; // 再加一点环境光
+    vec3 viewDir = normalize(-rd);           // 从 hit 点看向相机
 
+    /* 半球环境光（天空 + 地面） */
+    vec3 skyCol    = vec3(0.24, 0.32, 0.45);
+    vec3 groundCol = vec3(0.18, 0.15, 0.13);
+    vec3 hemi      = mix(groundCol, skyCol, n.y * 0.5 + 0.5);  // n.y [-1,1]
+
+    /* 两盏方向光 */
+    const vec3 kDir = normalize(vec3( 0.5, 0.7, -0.4));   // 主光
+    const vec3 fDir = normalize(vec3(-0.4, 0.3,  0.5));   // 反光
+    vec3 lightCol   = vec3(1.0, 0.97, 0.92);
+
+    float kDiff = max(dot(n, kDir), 0.0);
+    float fDiff = max(dot(n, fDir), 0.0);
+
+    /* Blinn‑Phong 高光 */
+    vec3 halfK = normalize(kDir + viewDir);
+    vec3 halfF = normalize(fDir + viewDir);
+    float kSpec = pow(max(dot(n, halfK), 0.0), 64.0);
+    float fSpec = pow(max(dot(n, halfF), 0.0), 64.0);
+
+    /* 混合：0.6 环境 + 方向光 + 0.4 高光 */
+    vec3 color =
+        baseCol * (hemi * 0.6 + lightCol * (0.9*kDiff + 0.4*fDiff))
+        + lightCol * 0.4 * (kSpec + fSpec);
+
+    color = pow(color, vec3(1.0/2.2));   // sRGB Gamma
     FragColor = vec4(color, 1.0);
 }
