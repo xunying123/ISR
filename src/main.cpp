@@ -104,9 +104,11 @@ int main()
                                     glm::vec3(0.5f, 0.f, 0.f),
                                     glm::vec3(0.f, 0.866f, 0.f),
                                     glm::vec3(0.f, 0.289f, 0.816f)));
-    // cpuObjs.push_back(create_sphere(glm::vec3(0.f,0.f,0.f),
-    //                                {0.2f,0.8f,0.2f,1},
-    //                                0.5f));                         
+    // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
+    //                                 glm::vec3(0.f,0.f,0.f),
+    //                                 0.5f));            
+    cpuObjs[0].scale(5.0f);         // 缩放   
+    cpuObjs[0].translate(glm::vec3(1.0f, 1.0f, 10.0f)); // 平移
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;
