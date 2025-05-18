@@ -12,9 +12,31 @@ float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
 }
-float sdBox(vec3 p, vec3 b)
+float sdBox(vec3 p, float alpha, float beta, float gamma, vec3 b)
 {
-    vec3 q = abs(p) - b;
+    // rotate around Z axis
+    mat3 Rz_alpha = mat3(
+        cos(alpha), -sin(alpha), 0.0,
+        sin(alpha),  cos(alpha), 0.0,
+        0.0,         0.0,        1.0
+    );
+
+    // rotate around X axis
+    mat3 Rx_beta = mat3(
+        1.0,         0.0,        0.0,
+        0.0,         cos(beta), -sin(beta),
+        0.0,         sin(beta),  cos(beta)
+    );
+
+    // rotate around Z axis
+    mat3 Rz_gamma = mat3(
+        cos(gamma), -sin(gamma), 0.0,
+        sin(gamma),  cos(gamma), 0.0,
+        0.0,         0.0,        1.0
+    );
+
+    mat3 R = Rz_gamma * Rx_beta * Rz_alpha;
+    vec3 q = abs(R * p) - b;
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
@@ -28,9 +50,9 @@ float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
 float sdCylinderFlat(vec3 p, vec3 a, vec3 b, float r)
 {
     vec3  ba   = b - a;
-    float h2   = length(ba) * 0.5;        
-    vec3  axis = ba / (h2 * 2.0);         
-    vec3  mid  = (a + b) * 0.5;           
+    float h2   = length(ba) * 0.5;
+    vec3  axis = ba / (h2 * 2.0);
+    vec3  mid  = (a + b) * 0.5;
 
     vec3 up  = abs(axis.z) < 0.999 ? vec3(0,0,1) : vec3(1,0,0);
     vec3 x   = normalize(cross(up, axis));
@@ -47,7 +69,7 @@ float sdCylinderFlat(vec3 p, vec3 a, vec3 b, float r)
 float sdCone(vec3 p, vec2 c, float h)
 {
     vec2 q = h * vec2(c.x / c.y, -1.0);
-        
+
     vec2 w = vec2(length(p.xz), p.y);
     vec2 a = w - q * clamp(dot(w,q) / dot(q,q), 0.0, 1.0);
     vec2 b = w - q * vec2(clamp(w.x / q.x, 0.0, 1.0), 1.0);
@@ -77,10 +99,10 @@ float sdTriangle(vec3 p, vec3 a, vec3 b, vec3 c) {
 
 float sdTetrahedron(vec3 p, vec3 v0, vec3 v1, vec3 v2, vec3 v3)
 {
-    vec3 cen = (v0+v1+v2+v3)*0.25;       
+    vec3 cen = (v0+v1+v2+v3)*0.25;
 
     vec3 n0 = normalize(cross(v1-v0, v2-v0));
-    if(dot(cen - v0, n0) > 0.0) n0 = -n0; 
+    if(dot(cen - v0, n0) > 0.0) n0 = -n0;
 
     vec3 n1 = normalize(cross(v2-v0, v3-v0));
     if(dot(cen - v0, n1) > 0.0) n1 = -n1;
@@ -109,7 +131,7 @@ float sdTetrahedron(vec3 p, vec3 v0, vec3 v1, vec3 v2, vec3 v3)
 float distOne(int idx, vec3 p, out vec3 objColor)
 {
     const int STRIDE = 8;               // 8 × vec4
-    int base = idx * STRIDE;  
+    int base = idx * STRIDE;
 
     vec4 t0 = texelFetch(objectBuffer, base + 0);   // type & RGB
     vec4 t1 = texelFetch(objectBuffer, base + 1);   // A + pos0~2
@@ -132,8 +154,8 @@ float distOne(int idx, vec3 p, out vec3 objColor)
         vec3 vertex = t2.xyz;           // (pos3~5)
         float radius = t2.w;            // (pos6)
 
-        vec3 axis = normalize(center - vertex);   
-        float height = length(center - vertex);   
+        vec3 axis = normalize(center - vertex);
+        float height = length(center - vertex);
 
         vec3 up = abs(axis.y) < 0.999 ? vec3(0,1,0) : vec3(1,0,0);
         vec3 x  = normalize(cross(up, axis));
@@ -143,7 +165,7 @@ float distOne(int idx, vec3 p, out vec3 objColor)
 
         vec3 p_local = transpose(basis) * (p - vertex);
 
-        float angle = atan(radius, height);      
+        float angle = atan(radius, height);
         vec2  c     = vec2(sin(angle), cos(angle));
 
         return sdCone(p_local, c, height);
@@ -151,16 +173,19 @@ float distOne(int idx, vec3 p, out vec3 objColor)
     }
     else if (type == 2)               /* ---------- CYLINDER ---------- */
     {
-        vec3 a       = t1.yzw;                    
-        vec3 b       = t2.xyz;                    
-        float radius = t2.w;                      
+        vec3 a       = t1.yzw;
+        vec3 b       = t2.xyz;
+        float radius = t2.w;
         return sdCylinderFlat(p, a, b, radius);
     }
     else if (type == 3)                 /* ---------- CUBOID ---------- */
     {
         vec3 center   = t1.yzw;                     // (pos0~2)
-        vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5; 
-        return sdBox(p - center, halfExt);
+        float alpha = t2.w;                        // (pos6)
+        float beta  = t3.x;                        // (pos7)
+        float gamma = t3.y;                        // (pos8)
+        vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5;  // (pos3~5)
+        return sdBox(p - center, alpha, beta, gamma, halfExt);
     }
     else if (type == 4)                 /* ---------- Tetrahedron ---------- */
     {

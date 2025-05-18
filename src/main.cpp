@@ -88,9 +88,9 @@ int main()
     using namespace Objects;
     std::vector<Object> cpuObjs;
 
-    // cpuObjs.push_back(create_cuboid(glm::vec3(-2.0f,0.5f,0.0f),
-    //                                 {0.2f,0.8f,0.2f,1},         
-    //                                 0.5f, 0.5f, 0.5f));
+    cpuObjs.push_back(create_cuboid({0.2f,0.8f,0.2f,1},
+                                    glm::vec3(-2.0f,0.5f,0.0f),      
+                                    0.5f, 0.5f, 0.5f, 3.0f, 3.0f, 3.0f));
     // cpuObjs.push_back(create_cone(glm::vec3(3.f,2.f,0.f),
     //                                 {1.f,0.f,0.f,1},         
     //                                 glm::vec3(-1.f, 3.f, 0.f),
@@ -99,16 +99,16 @@ int main()
     //                                 {0.2f,0.2f,0.8f,1},
     //                                 glm::vec3(0.f, 2.f, 0.f),
     //                                 0.5f));
-    cpuObjs.push_back(create_tetrahedron({1.f,0.f,0.f,1},
-                                    glm::vec3(-0.5f,0.f,0.f),
-                                    glm::vec3(0.5f, 0.f, 0.f),
-                                    glm::vec3(0.f, 0.866f, 0.f),
-                                    glm::vec3(0.f, 0.289f, 0.816f)));
+    // cpuObjs.push_back(create_tetrahedron({1.f,0.f,0.f,1},
+    //                                 glm::vec3(-0.5f,0.f,0.f),
+    //                                 glm::vec3(0.5f, 0.f, 0.f),
+    //                                 glm::vec3(0.f, 0.866f, 0.f),
+    //                                 glm::vec3(0.f, 0.289f, 0.816f)));
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            
-    cpuObjs[0].scale(5.0f);         // 缩放   
-    cpuObjs[0].translate(glm::vec3(1.0f, 1.0f, 10.0f)); // 平移
+    // cpuObjs[0].scale(5.0f);         // 缩放   
+    // cpuObjs[0].translate(glm::vec3(1.0f, 1.0f, 10.0f)); // 平移
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;
