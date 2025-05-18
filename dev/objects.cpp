@@ -1,4 +1,6 @@
+#include <glm/glm.hpp>
 #include "objects.h"
+
 
 std::vector<float> Objects::Object::packObjectToTextureData() {
     std::vector<float> textureData(32);
@@ -25,14 +27,64 @@ Objects::Object Objects::create_cylinder(Color color, glm::vec3 center1, glm::ve
     return Object{CYLINDER, color, {center1.x, center1.y, center1.z, center2.x, center2.y, center2.z, radius}};
 }
 
-Objects::Object Objects::create_cuboid(Color color, glm::vec3 center, float length, float width, float height) {
-    return Object{CUBOID, color, {center.x, center.y, center.z, length, width, height}};
+Objects::Object Objects::create_cuboid(Color color, glm::vec3 center, float alpha, float beta, float gamma, float length, float width, float height) {
+    return Object{CUBOID, color, {center.x, center.y, center.z, alpha, beta, gamma, length, width, height}};
 }
 
 Objects::Object Objects::create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4) {
     return Object{TETRAHEDRON, color, {vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z, vertex4.x, vertex4.y, vertex4.z}};
 }
 
+void Objects::Object::translate(const glm::vec3 &d) {
+    switch (type) {
+        case SPHERE:
+        case CUBOID:  // center xyz
+            pos_args[0] += d.x;
+            pos_args[1] += d.y;
+            pos_args[2] += d.z;
+            break;
+        case CONE:
+        case CYLINDER:
+            for (int i = 0; i < 6; ++i) pos_args[i] += d[i % 3];
+            break;
+        case TETRAHEDRON:
+            for (int i = 0; i < 12; i += 3) {
+                pos_args[i] += d.x;
+                pos_args[i + 1] += d.y;
+                pos_args[i + 2] += d.z;
+            }
+            break;
+    }
+}
+
+void Objects::Object::scale(float s) {
+    switch (type) {
+        case SPHERE:
+            pos_args[0] *= s;
+            pos_args[1] *= s;
+            pos_args[2] *= s; // center
+            pos_args[3] *= s;                                 // radius
+            break;
+        case CUBOID:
+            pos_args[0] *= s;
+            pos_args[1] *= s;
+            pos_args[2] *= s;
+            pos_args[3] *= s;
+            pos_args[4] *= s;
+            pos_args[5] *= s;
+            break;
+        case CONE:
+            for (int i = 0; i < 6; ++i) pos_args[i] *= s;            // base+apex
+            pos_args[6] *= s;                                 // radius
+            break;
+        case CYLINDER:
+            for (int i = 0; i < 6; ++i) pos_args[i] *= s;
+            pos_args[6] *= s;
+            break;
+        case TETRAHEDRON:
+            for (int i = 0; i < 12; ++i) pos_args[i] *= s;
+            break;
+        
 void Objects::Object::translate(const glm::vec3& d)
 {
     switch(type){
