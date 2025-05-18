@@ -73,10 +73,10 @@ namespace Objects {
 
         Object *create_union(Object *left, Object *right);
 
-        Object *create_difference(Object *left, Object *right);
-    }
+        Object *create_subtract(Object *left, Object *right);
+    };
 
-};
+}
 
 
 #endif //ISR_OBJECTS_H

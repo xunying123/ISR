@@ -21,15 +21,17 @@ namespace Objects {
                    Objects::Object *left, Objects::Object *right) {
         this->type = type;
         this->color = color;
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < pos_args.size(); ++i) {
             this->pos_args[i] = pos_args.begin()[i];
         }
-        assert(left != nullptr);
-        assert(right != nullptr);
         this->left = left;
         this->right = right;
-        this->left->parent = this;
-        this->right->parent = this;
+        if (left != nullptr) {
+            left->parent = this;
+        }
+        if (right != nullptr) {
+            right->parent = this;
+        }
     }
 
     CSG_tree::CSG_tree() {
@@ -121,7 +123,7 @@ namespace Objects {
         return unionObj;
     }
 
-    Object *CSG_tree::create_difference(Object *left, Object *right) {
+    Object *CSG_tree::create_subtract(Object *left, Object *right) {
         auto *difference = new Object(DIFFERENCE, {1.0f, 1.0f, 1.0f, 1.0f}, {}, left, right);
         object_list.push_back(difference);
         return difference;
