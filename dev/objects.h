@@ -14,7 +14,8 @@ namespace Objects {
         TETRAHEDRON,
         INTERSECTION,
         UNION,
-        DIFFERENCE
+        DIFFERENCE,
+        PLANE,
     };
 
     struct Color {
@@ -73,11 +74,15 @@ namespace Objects {
         Object *create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2,
                                    glm::vec3 vertex3, glm::vec3 vertex4);
 
+        Object *create_plane(Color color,
+                             glm::vec3 normal, float h);
+
         Object *create_intersection(Object *left, Object *right);
 
         Object *create_union(Object *left, Object *right);
 
         Object *create_subtract(Object *left, Object *right);
+
     };
 
 }

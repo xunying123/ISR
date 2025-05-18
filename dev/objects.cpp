@@ -144,7 +144,17 @@ namespace Objects {
     Object *CSG_tree::create_subtract(Object *left, Object *right) {
         auto *difference = new Object(DIFFERENCE, {1.0f, 1.0f, 1.0f, 1.0f}, {}, left, right);
         object_list.push_back(difference);
+     
         return difference;
+    }
+
+    Object* CSG_tree::create_plane(Color color,
+                               glm::vec3 normal,  
+                               float     h)       
+    {
+        auto* plane = new Object(PLANE, color, {normal.x, normal.y, normal.z, -h});
+        object_list.push_back(plane);
+        return plane;
     }
 
     void Object::translate(const glm::vec3 &d) {

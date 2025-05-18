@@ -137,6 +137,12 @@ float sdTetrahedron( vec3 p,
     return dMax;
 }
 
+float sdPlane(vec3 p, vec3 n, float h)
+{
+    return dot(p, n) + h;  
+}
+
+
 void distOne(int idx, vec3 p, inout vec4 stack[3], inout int stack_top)
 {
     const int STRIDE = 8;               // 8 × vec4
@@ -241,6 +247,13 @@ void distOne(int idx, vec3 p, inout vec4 stack[3], inout int stack_top)
         stack_top -= 1;
         float condition = step(sdf1, -sdf2);
         stack[stack_top - 1] = mix(vec4(color1, sdf1), vec4(color2, -sdf2), condition);
+    }
+    else if (type == 8)                 /* ---------- PLANE ---------- */
+    {
+        vec3 n = t1.yzw;
+        float h = t2.x;
+        stack[stack_top] = vec4(curColor, sdPlane(p, n, h));
+        stack_top += 1;
     }
 }
 

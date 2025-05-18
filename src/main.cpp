@@ -87,6 +87,9 @@ int main() {
     /* ---------- 4. 在 CPU 端创建任意数量的物体 ---------- */
     using namespace Objects;
     CSG_tree tree = CSG_tree();
+    auto* ground = tree.create_plane({0.7f,0.7f,0.7f,1},   // 淡灰色
+                                 {0.0f,1.0f,0.0f},     // 法向量朝 +Y
+                                 -1.0f);                // y = -1 → dot(p,n)+h=0
     // Object *obj1 = tree.create_cuboid({0.2f, 0.8f, 0.2f, 1},
     //                                   glm::vec3(-2.0f, 2.0f, 0.0f),
     //                                   2.0f, 2.0f, 2.0f, 0.0f, 0.0f, 0.0f);
@@ -111,12 +114,8 @@ int main() {
     //                                 glm::vec3(0.f, 0.866f, 0.f),
     //                                 glm::vec3(0.f, 0.289f, 0.816f));
     auto* box = tree.create_cuboid({1,0,0,1},
-                               {0,0,0}, 2,2,2,
+                               {0,1,0}, 2,2,2,
                                0,0,0);   // α,β,γ=0
-    box->rotate(glm::vec3(0,0,1), glm::radians(45.0f),
-                glm::vec3(0.0f));   
-    box->rotate(glm::vec3(1,0,0), glm::radians(45.0f),
-                glm::vec3(0.0f));
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            
