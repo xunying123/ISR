@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
 in  vec2 fragCoord;
 
@@ -93,44 +93,48 @@ float sdTriangle(vec3 p, vec3 a, vec3 b, vec3 c) {
     vec3 cb = c - b; vec3 pb = p - b;
     vec3 ac = a - c; vec3 pc = p - c;
     vec3 nor = cross(ba, ac);
-
-    return sqrt(
-        min(min(
-            sqrLength(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)),
-            sqrLength(pb - cb * clamp(dot(pb, cb) / dot(cb, cb), 0.0, 1.0))),
-            sqrLength(pc - ac * clamp(dot(pc, ac) / dot(ac, ac), 0.0, 1.0)))
-    + (dot(nor, pa) * dot(nor, pa)) / dot(nor, nor));
+    
+    float s = sign(dot(pa, nor));
+    
+    float sqDist = min(min(
+        sqrLength(pa - ba * clamp(dot(pa, ba)/dot(ba, ba), 0.0, 1.0)),
+        sqrLength(pb - cb * clamp(dot(pb, cb)/dot(cb, cb), 0.0, 1.0))),
+        sqrLength(pc - ac * clamp(dot(pc, ac)/dot(ac, ac), 0.0, 1.0)))
+    + (dot(nor, pa) * dot(nor, pa)) / dot(nor, nor);
+    
+    return s * sqrt(sqDist);
 }
 
-float sdTetrahedron(vec3 p, vec3 v0, vec3 v1, vec3 v2, vec3 v3)
+float sdTetrahedron( vec3 p,
+                     vec3 v0, vec3 v1,
+                     vec3 v2, vec3 v3 )
 {
-    vec3 cen = (v0+v1+v2+v3)*0.25;
+    vec3 verts[4] = vec3[]( v0, v1, v2, v3 );
+    int faces[4][3] = int[4][3](
+      int[3](0,1,2),  
+      int[3](0,2,3),  
+      int[3](0,3,1),  
+      int[3](1,3,2)   
+    );
 
-    vec3 n0 = normalize(cross(v1-v0, v2-v0));
-    if(dot(cen - v0, n0) > 0.0) n0 = -n0;
+    vec3 cen = (v0 + v1 + v2 + v3) * 0.25;
 
-    vec3 n1 = normalize(cross(v2-v0, v3-v0));
-    if(dot(cen - v0, n1) > 0.0) n1 = -n1;
+    float dMax = -1e20;
+    for(int i = 0; i < 4; ++i)
+    {
+        vec3 a = verts[faces[i][0]];
+        vec3 b = verts[faces[i][1]];
+        vec3 c = verts[faces[i][2]];
 
-    vec3 n2 = normalize(cross(v3-v0, v1-v0));
-    if(dot(cen - v0, n2) > 0.0) n2 = -n2;
+        vec3 n = normalize( cross( b - a, c - a ) );
+        if( dot(cen - a, n) > 0.0 ) 
+            n = -n;
 
-    vec3 n3 = normalize(cross(v1-v2, v3-v2));
-    if(dot(cen - v2, n3) > 0.0) n3 = -n3;
+        float d = dot( p - a, n );
+        dMax = max(dMax, d);
+    }
 
-    float d0 = dot(p - v0, n0);
-    float d1 = dot(p - v0, n1);
-    float d2 = dot(p - v0, n2);
-    float d3 = dot(p - v2, n3);
-
-    if(d0<=0.0 && d1<=0.0 && d2<=0.0 && d3<=0.0)
-        return max(max(d0, max(d1,d2)), d3);
-
-    float dist0 = sdTriangle(p, v0, v1, v2);
-    float dist1 = sdTriangle(p, v0, v2, v3);
-    float dist2 = sdTriangle(p, v0, v3, v1);
-    float dist3 = sdTriangle(p, v1, v2, v3);
-    return min(min(dist0, dist1), min(dist2, dist3));
+    return dMax;
 }
 
 void distOne(int idx, vec3 p, inout vec4 stack[3], inout int stack_top)
@@ -315,7 +319,7 @@ float calcAO(vec3 p, vec3 n)
         float d = map(p + n * dist, colDummy);   // 距离场
 
         occ += (dist - d) * w;             // d 越小 → 遮挡越重
-        w   *= 0.7;                        // 权重递减
+        w   *= 0.8;                        // 权重递减
     }
     return clamp(1.0 - occ, 0.0, 1.0);     // 1→完全暴露, 0→全遮
 }

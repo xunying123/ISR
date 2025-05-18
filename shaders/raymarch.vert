@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 // ---------- 顶点属性 ----------
 layout (location = 0) in vec2 aPos;   // 来自 VBO 的二维顶点坐标（范围 −1..1）
 

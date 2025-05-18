@@ -85,12 +85,12 @@ int main() {
     /* ---------- 4. 在 CPU 端创建任意数量的物体 ---------- */
     using namespace Objects;
     CSG_tree tree = CSG_tree();
-    Object *obj1 = tree.create_cuboid({0.2f, 0.8f, 0.2f, 1},
-                                      glm::vec3(-2.0f, 2.0f, 0.0f),
-                                      2.0f, 2.0f, 2.0f, 0.0f, 0.0f, 0.0f);
-    Object *obj2 = tree.create_sphere({0.2f, 0.2f, 0.8f, 1},
-                                      glm::vec3(-2.0f, 2.0f, 0.0f), 1.2f);
-    Object *obj3 = tree.create_subtract(obj1, obj2);
+    // Object *obj1 = tree.create_cuboid({0.2f, 0.8f, 0.2f, 1},
+    //                                   glm::vec3(-2.0f, 2.0f, 0.0f),
+    //                                   2.0f, 2.0f, 2.0f, 0.0f, 0.0f, 0.0f);
+    // Object *obj2 = tree.create_sphere({0.2f, 0.2f, 0.8f, 1},
+    //                                   glm::vec3(-2.0f, 2.0f, 0.0f), 1.2f);
+    // Object *obj3 = tree.create_subtract(obj1, obj2);
 
 //            cpuObjs.push_back(create_cuboid({0.2f, 0.8f, 0.2f, 1},
 //                                            glm::vec3(-2.0f, 0.5f, 0.0f),
@@ -103,11 +103,18 @@ int main() {
     //                                 {0.2f,0.2f,0.8f,1},
     //                                 glm::vec3(0.f, 2.f, 0.f),
     //                                 0.5f));
-    // cpuObjs.push_back(create_tetrahedron({1.f,0.f,0.f,1},
+    // tree.create_tetrahedron({1.f,0.f,0.f,1},
     //                                 glm::vec3(-0.5f,0.f,0.f),
     //                                 glm::vec3(0.5f, 0.f, 0.f),
     //                                 glm::vec3(0.f, 0.866f, 0.f),
-    //                                 glm::vec3(0.f, 0.289f, 0.816f)));
+    //                                 glm::vec3(0.f, 0.289f, 0.816f));
+    Object *obj1 = tree.create_tetrahedron(
+    {1.f, 0.4f, 0.1f, 1.f},
+    glm::vec3(-1.f, 0.0f,  0.f),   // v0
+    glm::vec3( 1.0f, 0.0f, 0.0f),   // v1
+    glm::vec3( 0.0f, 1.7f,  0.0f),   // v2
+    glm::vec3( 0.f, 0.6f,  -1.0f));  // v3
+    obj1->scale(1.f);
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            
