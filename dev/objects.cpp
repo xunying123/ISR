@@ -13,22 +13,62 @@ std::vector<float> Objects::Object::packObjectToTextureData() {
     return textureData;
 }
 
-Objects::Object Objects::create_sphere(glm::vec3 center, Color color, float radius) {
+Objects::Object Objects::create_sphere(Color color, glm::vec3 center, float radius) {
     return Object{SPHERE, color, {center.x, center.y, center.z, radius}};
 }
 
-Objects::Object Objects::create_cone(glm::vec3 center, Color color, glm::vec3 vertex, float radius) {
+Objects::Object Objects::create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius) {
     return Object{CONE, color, {center.x, center.y, center.z, vertex.x, vertex.y, vertex.z, radius}};
 }
 
-Objects::Object Objects::create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius) {
+Objects::Object Objects::create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius) {
     return Object{CYLINDER, color, {center1.x, center1.y, center1.z, center2.x, center2.y, center2.z, radius}};
 }
 
-Objects::Object Objects::create_cuboid(glm::vec3 center, Color color, float length, float width, float height) {
+Objects::Object Objects::create_cuboid(Color color, glm::vec3 center, float length, float width, float height) {
     return Object{CUBOID, color, {center.x, center.y, center.z, length, width, height}};
 }
 
-Objects::Object Objects::create_tetrahedron(glm::vec3 vertex1, Color color, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4) {
+Objects::Object Objects::create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4) {
     return Object{TETRAHEDRON, color, {vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z, vertex4.x, vertex4.y, vertex4.z}};
+}
+
+void Objects::Object::translate(const glm::vec3& d)
+{
+    switch(type){
+    case SPHERE:
+    case CUBOID:  // center xyz
+        pos_args[0]+=d.x; pos_args[1]+=d.y; pos_args[2]+=d.z; break;
+    case CONE:
+    case CYLINDER:
+        for(int i=0;i<6;++i) pos_args[i]+=d[i%3];
+        break;
+    case TETRAHEDRON:
+        for(int i=0;i<12;i+=3){ pos_args[i]+=d.x; pos_args[i+1]+=d.y; pos_args[i+2]+=d.z; }
+        break;
+    }
+}
+void Objects::Object::scale(float s)
+{
+    switch(type){
+    case SPHERE:
+        pos_args[0]*=s; pos_args[1]*=s; pos_args[2]*=s; // center
+        pos_args[3]*=s;                                 // radius
+        break;
+    case CUBOID:
+        pos_args[0]*=s; pos_args[1]*=s; pos_args[2]*=s;
+        pos_args[3]*=s; pos_args[4]*=s; pos_args[5]*=s;
+        break;
+    case CONE:
+        for(int i=0;i<6;++i) pos_args[i]*=s;            // base+apex
+        pos_args[6]*=s;                                 // radius
+        break;
+    case CYLINDER:
+        for(int i=0;i<6;++i) pos_args[i]*=s;
+        pos_args[6]*=s;
+        break;
+    case TETRAHEDRON:
+        for(int i=0;i<12;++i) pos_args[i]*=s;
+        break;
+    }
 }

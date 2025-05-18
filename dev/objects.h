@@ -24,17 +24,19 @@ namespace Objects {
         float pos_args[12];
 
         std::vector<float> packObjectToTextureData();
+        void translate(const glm::vec3& d);
+        void scale(float s);
     };
 
-    Object create_sphere(glm::vec3 center, Color color, float radius);
+    Object create_sphere(Color color, glm::vec3 center, float radius);
 
-    Object create_cone(glm::vec3 center, Color color, glm::vec3 vertex, float radius);
+    Object create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius);
 
-    Object create_cylinder(glm::vec3 center1, Color color, glm::vec3 center2, float radius);
+    Object create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius);
 
-    Object create_cuboid(glm::vec3 center, Color color, float length, float width, float height);
+    Object create_cuboid(Color color, glm::vec3 center, float length, float width, float height);
 
-    Object create_tetrahedron(glm::vec3 vertex1, Color color, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4);
+    Object create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2, glm::vec3 vertex3, glm::vec3 vertex4);
 
 }
 #endif //ISR_OBJECTS_H

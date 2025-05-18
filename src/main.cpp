@@ -99,8 +99,8 @@ int main()
     //                                 {0.2f,0.2f,0.8f,1},
     //                                 glm::vec3(0.f, 2.f, 0.f),
     //                                 0.5f));
-    cpuObjs.push_back(create_tetrahedron(glm::vec3(-0.5f,0.f,0.f),
-                                    {1.f,0.f,0.f,1},
+    cpuObjs.push_back(create_tetrahedron({1.f,0.f,0.f,1},
+                                    glm::vec3(-0.5f,0.f,0.f),
                                     glm::vec3(0.5f, 0.f, 0.f),
                                     glm::vec3(0.f, 0.866f, 0.f),
                                     glm::vec3(0.f, 0.289f, 0.816f)));
