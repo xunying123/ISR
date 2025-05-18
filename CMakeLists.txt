@@ -1,9 +1,13 @@
-cmake_minimum_required(VERSION 3.10)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+cmake_minimum_required(VERSION 3.21)
 project(ISR)
-find_package(glfw3 REQUIRED)
-file(GLOB SRC_FILES dev/*.h dev/*.cpp src/*.cpp src/*.c)
-add_executable(${PROJECT_NAME} ${SRC_FILES})
-include_directories(${CMAKE_SOURCE_DIR}/dev)
-target_link_libraries(${PROJECT_NAME} glfw)
+
+set(CMAKE_CXX_STANDARD 14)
+
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/include)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/dev)
+link_directories(${PROJECT_SOURCE_DIR}/lib)
+file(GLOB SOURCES dev/*.h dev/*.cpp src/*.h src/*.c src/*.cpp)
+add_executable(OpenGL ${SOURCES})
+target_link_libraries(OpenGL ${PROJECT_SOURCE_DIR}/glfw/cmake-build-debug/src/libglfw.so)
+
+
