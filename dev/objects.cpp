@@ -1,5 +1,23 @@
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "objects.h"
+
+glm::vec3 matrixToEulerZYX(const glm::mat3& m)
+{
+    float sy = std::sqrt(m[0][0] * m[0][0] + m[1][0] * m[1][0]);
+    bool singular = sy < 1e-6f;
+    float x, y, z;           // x→roll(γ), y→pitch(β), z→yaw(α)
+    if (!singular) {
+        x = std::atan2(m[2][1], m[2][2]);
+        y = std::atan2(-m[2][0],  sy);
+        z = std::atan2(m[1][0],  m[0][0]);
+    } else {                 // gimbal lock
+        x = std::atan2(-m[1][2], m[1][1]);
+        y = std::atan2(-m[2][0],  sy);
+        z = 0.0f;
+    }
+    return glm::vec3(x, y, z);     // (γ,β,α)
+}
 
 namespace Objects {
 
@@ -218,5 +236,64 @@ namespace Objects {
             }
         }
     }
+
+    void Object::rotate(const glm::vec3& axis,
+                    float angleRad,
+                    const glm::vec3& pivot)
+    {
+        glm::mat4 R4 = glm::rotate(glm::mat4(1.0f), angleRad, glm::normalize(axis));
+        glm::mat3 R  = glm::mat3(R4);
+
+        auto apply = [&](float& x, float& y, float& z)
+        {
+            glm::vec3 p(x, y, z);
+            p = glm::vec3(R * glm::vec4(p - pivot, 1.0f)) + pivot;
+            x = p.x;  y = p.y;  z = p.z;
+        };
+
+        switch (type)
+        {
+            case SPHERE:
+                apply(pos_args[0], pos_args[1], pos_args[2]);
+                break;
+
+            case CUBOID:
+            {
+                apply(pos_args[0], pos_args[1], pos_args[2]);
+
+                float alpha = pos_args[6];
+                float beta  = pos_args[7];
+                float gamma = pos_args[8];
+
+                glm::mat3 M_old = glm::mat3(
+                    glm::rotate(glm::mat4(1.0f), alpha, glm::vec3(0,0,1)) *
+                    glm::rotate(glm::mat4(1.0f), beta,  glm::vec3(0,1,0)) *
+                    glm::rotate(glm::mat4(1.0f), gamma, glm::vec3(1,0,0))
+                );
+
+                glm::mat3 M_new = R * M_old;
+                glm::vec3 eul   = matrixToEulerZYX(M_new);
+
+                pos_args[6] = eul.z;   // α'
+                pos_args[7] = eul.y;   // β'
+                pos_args[8] = eul.x;   // γ'
+                break;
+            }
+
+            case CONE:
+            case CYLINDER:
+                for (int i = 0; i < 6; i += 3)
+                    apply(pos_args[i], pos_args[i+1], pos_args[i+2]);
+                break;
+
+            case TETRAHEDRON:
+                for (int i = 0; i < 12; i += 3)
+                    apply(pos_args[i], pos_args[i+1], pos_args[i+2]);
+                break;
+
+            default: break;
+        }
+    }
+
 
 }

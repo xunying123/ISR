@@ -1,7 +1,9 @@
 // main.cpp
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/vec3.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <iostream>
 #include <vector>
 #include "objects.h"
@@ -108,13 +110,13 @@ int main() {
     //                                 glm::vec3(0.5f, 0.f, 0.f),
     //                                 glm::vec3(0.f, 0.866f, 0.f),
     //                                 glm::vec3(0.f, 0.289f, 0.816f));
-    Object *obj1 = tree.create_tetrahedron(
-    {1.f, 0.4f, 0.1f, 1.f},
-    glm::vec3(-1.f, 0.0f,  0.f),   // v0
-    glm::vec3( 1.0f, 0.0f, 0.0f),   // v1
-    glm::vec3( 0.0f, 1.7f,  0.0f),   // v2
-    glm::vec3( 0.f, 0.6f,  -1.0f));  // v3
-    obj1->scale(1.f);
+    auto* box = tree.create_cuboid({1,0,0,1},
+                               {0,0,0}, 2,2,2,
+                               0,0,0);   // α,β,γ=0
+    box->rotate(glm::vec3(0,0,1), glm::radians(45.0f),
+                glm::vec3(0.0f));   
+    box->rotate(glm::vec3(1,0,0), glm::radians(45.0f),
+                glm::vec3(0.0f));
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            

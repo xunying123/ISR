@@ -40,6 +40,10 @@ namespace Objects {
         void translate(const glm::vec3 &d);
 
         void scale(float s);
+
+        void rotate(const glm::vec3& axis,
+            float angleRad,
+            const glm::vec3& pivot = glm::vec3(0.0f));
     };
 
     class CSG_tree {
