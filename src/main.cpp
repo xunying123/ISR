@@ -4,7 +4,6 @@
 #include <glm/vec3.hpp>
 #include <iostream>
 #include <vector>
-
 #include "objects.h"
 #include <fstream>
 #include <sstream>
@@ -114,6 +113,27 @@ int main() {
     //                                 0.5f));            
     // cpuObjs[0].scale(5.0f);         // 缩放   
     // cpuObjs[0].translate(glm::vec3(1.0f, 1.0f, 10.0f)); // 平移
+//    /* 1. 红色球（向上抬 0.5） */
+//    Object sph = create_sphere({1.0f,0.3f,0.3f,1.0f},
+//                               {0.0f,0.0f,0.0f}, 1.0f);
+//    sph.translate({0.0f,0.5f,0.0f});
+//    cpuObjs.push_back(sph);
+//
+//    /* 2. 橙色圆锥（底面中心固定在地面 (-3,0,0)）*/
+//    cpuObjs.push_back(
+//        create_cone({1.0f,0.6f,0.2f,1.0f},
+//                    {-3.0f,1.0f,0.0f},         // baseCenter
+//                    {-3.0f,3.0f,0.0f},         // apex
+//                    1.0f));                    // 半径
+//
+//    /* 3. 蓝色圆柱（竖直，scale 放大 1.5 倍）*/
+//    Object cyl = create_cylinder({0.2f,0.6f,1.0f,1.0f},
+//                                 { 2.0f,0.0f, 2.0f},    // 端点 A (支点)
+//                                 { 2.0f,2.0f, 2.0f},    // 端点 B
+//                                 0.4f);                 // 半径
+//    cyl.scale(1.5f);
+//    cyl.translate({0.0f,1.0f,0.0f});      // 向上抬 0.5
+//    cpuObjs.push_back(cyl);
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;
