@@ -113,35 +113,32 @@ int main() {
     //                                 glm::vec3(0.5f, 0.f, 0.f),
     //                                 glm::vec3(0.f, 0.866f, 0.f),
     //                                 glm::vec3(0.f, 0.289f, 0.816f));
-    auto* box = tree.create_cuboid({1,0,0,1},
-                               {0,1,0}, 2,2,2,
-                               0,0,0);   // α,β,γ=0
+    // auto* box = tree.create_cuboid({1,0,0,1},
+    //                            {0,1,0}, 2,2,2,
+    //                            0,0,0);   // α,β,γ=0
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            
     // cpuObjs[0].scale(5.0f);         // 缩放   
     // cpuObjs[0].translate(glm::vec3(1.0f, 1.0f, 10.0f)); // 平移
 //    /* 1. 红色球（向上抬 0.5） */
-//    Object sph = create_sphere({1.0f,0.3f,0.3f,1.0f},
-//                               {0.0f,0.0f,0.0f}, 1.0f);
-//    sph.translate({0.0f,0.5f,0.0f});
-//    cpuObjs.push_back(sph);
+   auto* sph = tree.create_sphere({1.0f,0.3f,0.3f,1.0f},
+                              {-1.0f,0.0f,0.0f}, 1.0f);
+   sph->translate({0.0f,-0.5f,0.0f});
 //
 //    /* 2. 橙色圆锥（底面中心固定在地面 (-3,0,0)）*/
-//    cpuObjs.push_back(
-//        create_cone({1.0f,0.6f,0.2f,1.0f},
-//                    {-3.0f,1.0f,0.0f},         // baseCenter
-//                    {-3.0f,3.0f,0.0f},         // apex
-//                    1.0f));                    // 半径
+    auto* cone = tree.create_cone({1.0f,0.6f,0.2f,1.0f},
+                   {-3.0f,-1.0f,0.0f},         // baseCenter
+                   {-3.0f,2.0f,0.0f},         // apex
+                   1.0f);                    // 半径
 //
 //    /* 3. 蓝色圆柱（竖直，scale 放大 1.5 倍）*/
-//    Object cyl = create_cylinder({0.2f,0.6f,1.0f,1.0f},
-//                                 { 2.0f,0.0f, 2.0f},    // 端点 A (支点)
-//                                 { 2.0f,2.0f, 2.0f},    // 端点 B
-//                                 0.4f);                 // 半径
-//    cyl.scale(1.5f);
-//    cyl.translate({0.0f,1.0f,0.0f});      // 向上抬 0.5
-//    cpuObjs.push_back(cyl);
+   auto* cyl = tree.create_cylinder({0.2f,0.6f,1.0f,1.0f},
+                                { 2.0f,0.0f, 2.0f},    // 端点 A (支点)
+                                { 2.0f,2.0f, 2.0f},    // 端点 B
+                                0.4f);                 // 半径
+   cyl->scale(1.5f);
+   cyl->translate({0.0f,-1.0f,0.0f});      // 向上抬 0.5
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;

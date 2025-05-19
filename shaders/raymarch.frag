@@ -8,11 +8,6 @@ uniform float iTime;                // 时间（可做动画）
 uniform samplerBuffer objectBuffer; // TBO 采样器
 uniform int           numObjects;   // 物体数量
 
-const int MAX_POINT = 8;                 // 需要几盏调几盏
-uniform int  uPointCnt;                  // 实际使用数量
-uniform vec3 uPointPos[MAX_POINT];       // 位置
-uniform vec3 uPointCol[MAX_POINT];       // 颜色(含强度，1=白灯)
-
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
@@ -271,7 +266,7 @@ float map(vec3 p, out vec3 col)
 
 vec3 calcNormal(vec3 p)
 {
-    const float h = 1e-3;
+    const float h = 5e-4;
     vec3 dummy;
     vec2 k = vec2(1.0, -1.0);
     return normalize(
@@ -293,7 +288,7 @@ float softShadow(vec3 ro, vec3 rd, float mint, float maxt)
         vec3  dump;
         float h   = map(pos, dump);          // 场景 SDF
         if(h < 5e-5) return 0.0;             // 命中遮挡
-        res = min(res, 6.0 * h / t);         // penumbra
+        res = min(res, 8.0 * h / t);         // penumbra
         t  += clamp(h, 0.02, 0.25);          // 步长
     }
     return clamp(res, 0.0, 1.0);
@@ -312,7 +307,7 @@ float softShadowPoint(vec3 ro, vec3 rd, float distMax)
         vec3  dump;
         float h   = map(pos, dump);
         if(h < 5e-5) return 0.0;
-        res = min(res, 5.0 * h / t);
+        res = min(res, 6.0 * h / t);
         t  += clamp(h, 0.02, 0.20);
     }
     return clamp(res, 0.0, 1.0);
@@ -323,16 +318,16 @@ float calcAO(vec3 p, vec3 n)
 {
     float occ = 0.0;          // 累积遮挡量
     float w   = 1.0;          // 当前权重
-    const int SAMPLE = 8;     // ★ 可调：5≈实时，8–12 略好，16 离线
+    const int SAMPLE = 16;     // ★ 可调：5≈实时，8–12 略好，16 离线
 
     for(int i = 1; i <= SAMPLE; ++i)
     {
-        float dist = 0.03 * float(i);     // 采样半径 (线性增长)
+        float dist = 0.02 * float(i);     // 采样半径 (线性增长)
         vec3  colDummy;
         float d = map(p + n * dist, colDummy);   // 距离场
 
         occ += (dist - d) * w;             // d 越小 → 遮挡越重
-        w   *= 0.8;                        // 权重递减
+        w   *= 0.6;                        // 权重递减
     }
     return clamp(1.0 - occ, 0.0, 1.0);     // 1→完全暴露, 0→全遮
 }
@@ -343,7 +338,7 @@ float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
     const float EPS  = 1e-4;
     const float TMAX = 100.0;
     float t = 0.0;
-    for (int i = 0; i < 256; ++i)
+    for (int i = 0; i < 512; ++i)
     {
         pos = ro + rd * t;
         float d = map(pos, col);
@@ -360,8 +355,10 @@ void main()
     vec2 uv = (fragCoord * 2.0 - 1.0);
     uv.x *= iResolution.x / iResolution.y;
 
-    vec3 ro = vec3(0.0, 0.0, -5.0);     // camera pos
+    vec3 ro = vec3(0.0, 2.0, -5.0);     // camera pos
     vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
+    float pitch = radians(-20.0);            // 俯视 10°
+    rd.yz = mat2(cos(pitch), -sin(pitch), sin(pitch),  cos(pitch)) * rd.yz;
 
     /* 2) Ray March */
     vec3 hitPos, baseCol;
@@ -387,7 +384,7 @@ void main()
     /* === 两盏方向光 === */
     const vec3 kDir = normalize(vec3( 0.5, 0.7, -0.4));    // 主光
     const vec3 fDir = normalize(vec3(-0.4, 0.3,  0.5));    // 反光
-    vec3  lightCol  = vec3(1.15, 0.97, 0.85);
+    vec3  lightCol  = vec3(1.08, 0.97, 0.90);
 
     /* 主光软阴影 */
     float kShadow = softShadow(hitPos + n*1e-3, kDir, 0.05, 20.0);
@@ -408,32 +405,17 @@ void main()
                 + lightCol * (0.9*kDiff + 0.4*fDiff))   // 两盏方向光漫反射
         + lightCol * 0.4 * (kSpec + fSpec);                // 高光
 
-    /* ---------- 点光循环 ---------- */
-    for(int i = 0; i < uPointCnt; ++i)
-    {
-        vec3  L    = uPointPos[i] - hitPos;
-        float dist = length(L);
-        L /= dist;
-
-        /* 衰减 & 阴影 */
-        float atten  = 1.0 / (1.0 + 0.09*dist + 0.032*dist*dist);
-        float shadow = softShadowPoint(hitPos + n*1e-3, L, dist);
-
-        /* 漫反射 + 高光 */
-        float diff = max(dot(n, L), 0.0);
-        vec3 halfP = normalize(L + viewDir);
-        float spec = pow(max(dot(n, halfP), 0.0), 64.0);
-
-        vec3 light = uPointCol[i] * atten * shadow;
-        color += light * (baseCol * diff + spec);
-    }
-
     /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
-    float exposure = 1.0;                                   // 可调曝光
+    float exposure = 0.9;                                   // 可调曝光
     color *= exposure;
 
     color = (color * (2.51*color + 0.03)) /                 // ACES 近似
             (color * (2.43*color + 0.59) + 0.14);
+
+        /* ====== 提升饱和度 ====== */
+    float sat = 1.5;                               // 1 = 原饱和度
+    float Y   = dot(color, vec3(0.2126,0.7152,0.0722)); // 线性亮度
+    color = mix(vec3(Y), color, sat);               // sat↑→更鲜艳
 
     color = pow(color, vec3(1.0/2.2));                      // sRGB Gamma
     FragColor = vec4(color, 1.0);
