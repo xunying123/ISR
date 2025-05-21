@@ -38,7 +38,7 @@ We use constructive solid geometry tree (CSG tree) to build the complex objects 
     <img src="./doc/CFG.png" style="zoom: 67%;" />
 </div>
 
-In the actual GPU rendering implementation, we utilize texture memory to store the CSG tree. To avoid recursive calls, which are inefficient and prone to stack overflow in GPU rendering, we store the nodes of the CSG tree in the order of a post-order traversal. This way, we can sequentially traverse all nodes during the SDF computation. Thanks to the post-order traversal order, we only need a stack of length 3 to traverse the entire tree and obtain the final SDF. This significantly reduces the overhead. Here's the example of the processing stack of the former example.
+In the actual GPU rendering implementation, we utilize texture memory to store the CSG tree. To avoid recursive calls, which are inefficient and prone to stack overflow in GPU rendering, we store the nodes of the CSG tree in the order of a post-order traversal on CPU and processing with stack on GPU. Furthermore, to minimize the required stack length, we apply dynamic programming to determine the best post-order traversal order. In this way, we can sequentially traverse all nodes during the SDF computation without recursive calls, and with the stack in minimal length. This significantly reduces the overhead. Here's the example of the processing stack of the former example.
 
 <div style="text-align: center;">
 	<img src="./doc/stack.png" style="zoom: 44%;" />
@@ -52,11 +52,11 @@ In the actual GPU rendering implementation, we utilize texture memory to store t
 
 - **Soft-shadow**: Unlike hard shadows, which have sharp edges, soft shadows have gradual transitions, making them more natural and visually appealing. 
 
-- **Screen-Space Ambient Occlusion**:  In the object seams, folding corner automatic dark, enhance the three-dimensional sense
+- **Screen-Space Ambient Occlusion**:  In the object seams, folding corner automatic dark, enhance the three-dimensional sense.
 
-- **Blinn-Phong**: Fast, numerically friendly specular highlight approximation
+- **Blinn-Phong**: Fast, numerically friendly specular highlight approximation.
 
-- **ACES, Exposure, Saturation, sRGB**: Make the light more realistic
+- **ACES, Exposure, Saturation, sRGB**: Make the light more realistic.
 
 ## Preliminary results
 
