@@ -46,22 +46,24 @@ In the actual GPU rendering implementation, we utilize texture memory to store t
 
 ### Environment lights
 
-\- Hemispheric Ambient: this technique creates a bright top and a dark bottom, simulating the natural effect of ambient light coming from the sky and the ground. It helps to establish a basic lighting environment that enhances the overall scene.
+- **Hemispheric Ambient**: this technique creates a bright top and a dark bottom, simulating the natural effect of ambient light coming from the sky and the ground. It helps to establish a basic lighting environment that enhances the overall scene.
 
-\- Key Light and Fill Light: The key light is used to illuminate the main subject and create shadows, defining the primary light direction and shape. The fill light, on the other hand, is used to "soften" the shadows and brighten the darker areas, ensuring that the contrast is not too harsh and maintaining detail in the shadowed regions.
+- **Key Light and Fill Light**: The key light is used to illuminate the main subject and create shadows, defining the primary light direction and shape. The fill light, on the other hand, is used to "soften" the shadows and brighten the darker areas, ensuring that the contrast is not too harsh and maintaining detail in the shadowed regions.
 
-\- Soft-shadow: Unlike hard shadows, which have sharp edges, soft shadows have gradual transitions, making them more natural and visually appealing. 
+- **Soft-shadow**: Unlike hard shadows, which have sharp edges, soft shadows have gradual transitions, making them more natural and visually appealing. 
 
-\- Screen-Space Ambient Occlusion:  In the object seams, folding corner automatic dark, enhance the three-dimensional sense
+- **Screen-Space Ambient Occlusion**:  In the object seams, folding corner automatic dark, enhance the three-dimensional sense
 
-\- Blinn-Phong: Fast, numerically friendly specular highlight approximation
+- **Blinn-Phong**: Fast, numerically friendly specular highlight approximation
 
-\- ACES, Exposure, Saturation, sRGB: Make the light more realistic
+- **ACES, Exposure, Saturation, sRGB**: Make the light more realistic
 
 ## Preliminary results
 
 ### Basic shapes
-The following shows the result of rendering basic shapes (now support sphere, cone, cylinder, cuboid, tetrahedron).
+The following shows the result of rendering basic shapes, including sphere, cone, cylinder, cuboid, and arbitrary  tetrahedron.
+Thanks to the expressiveness of signed distance functions (SDFs), all primitives inherently support arbitrary **size**, **orientation**, and **placement** in 3D space.
+On top of that, we implemented a unified interface for applying **translation**, **rotation**, and **scaling** transformations to individual objects.
 
 <div style="text-align: center;">
 	<img src="./doc/basic.png" style="zoom: 67%;" />
@@ -90,11 +92,31 @@ We also set the background texture. We load the texture to the GPU texture-memor
 <div style="text-align: center;">
 	<img src="./doc/background.png" style="zoom: 67%;" />
 </div>
-
 ## The next plan
 
-* Implementing infinite repetition, fractals and symmetry
-* Support more materials (metal, glass) & implement refraction and reflection
+Our immediate focus is to **enhance realism and material variety**. Based on the current SDF-based renderer, we plan to support more materials, including:
+
+- **Metal and Glass shaders**
+
+- **Reflection and Refraction**
+
+- **Fresnel effects**
+
+This will provide the foundation for richer visual quality and prepare the system for physically-plausible rendering. After that, we set out three alternative directions for further development:
+
+- **Implementing fractals and infinite structures(main)**：We plan to support mathematically defined complex geometries such as **fractal objects** (never-ending patterns based on mathematical equations, e.g. Menger Sponge, Mandelbulb, Julia set). These are ideal use cases for signed distance fields due to their recursive nature and self-similarity.
+
+<div style="text-align: center;">
+	<img src="./doc/menger.png" style="zoom: 67%;" />
+</div>
+
+<div style="text-align: center;">
+	<img src="./doc/julia.png" style="zoom: 67%;" />
+</div>
+​	Techniques involved: Recursive or loop-based GLSL SDFs or Distance Estimation for Fractals, LOD(Level Of Details) / Adaptive Iteration, Orbit trapping, Smooth Interpolation for Discrete Iteration…
+
+- **Building interactive UI and object manipulation**: We aim to implement a basic desktop GUI system that allows users to **rotate/zoom the camera** and **interactively add or manipulate objects** in the scene. This will transform the renderer from a static tool into an interactive modeling environment. 
+- **Improving ray marching efficiency**: Ray marching performance is currently limited by unnecessary steps in empty space and deep recursion for complex scenes. We will integrate basic optimization techniques to improve both **frame rate and step efficiency**, making our renderer more scalable.
 
 ## Credit
 
