@@ -138,7 +138,7 @@ float sdPlane(vec3 p, vec3 n, float h)
 }
 
 
-void distOne(int idx, vec3 p, inout vec4 stack[3], inout int stack_top)
+void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
 {
     const int STRIDE = 8;               // 8 × vec4
     int base = idx * STRIDE;
@@ -254,7 +254,7 @@ void distOne(int idx, vec3 p, inout vec4 stack[3], inout int stack_top)
 
 float map(vec3 p, out vec3 col)
 {
-    vec4 stack[3] = vec4[3](vec4(0.0), vec4(0.0), vec4(0.0));
+    vec4 stack[8] = vec4[8](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
     int stack_top = 0;
     for (int i = 0; i < numObjects; ++i)
     {

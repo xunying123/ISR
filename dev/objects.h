@@ -31,6 +31,8 @@ namespace Objects {
         Object *left = nullptr;
         Object *right = nullptr;
         Object *parent = nullptr;
+        int max_stack_length = 0;
+        bool first_left = true;
 
         std::vector<float> packObjectToTextureData();
 
@@ -42,15 +44,17 @@ namespace Objects {
 
         void scale(float s);
 
-        void rotate(const glm::vec3& axis,
-            float angleRad,
-            const glm::vec3& pivot = glm::vec3(0.0f));
+        void rotate(const glm::vec3 &axis,
+                    float angleRad,
+                    const glm::vec3 &pivot = glm::vec3(0.0f));
     };
 
     class CSG_tree {
 
         Object *root;
         std::vector<Object *> object_list;
+
+        void get_min_stack_order(Object *object);
 
         void generate_texture_data_postorder(Object *object,
                                              std::vector<std::vector<float>> &textureData);

@@ -1,19 +1,19 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
 #include "objects.h"
 
-glm::vec3 matrixToEulerZYX(const glm::mat3& m)
-{
+glm::vec3 matrixToEulerZYX(const glm::mat3 &m) {
     float sy = std::sqrt(m[0][0] * m[0][0] + m[1][0] * m[1][0]);
     bool singular = sy < 1e-6f;
     float x, y, z;           // x→roll(γ), y→pitch(β), z→yaw(α)
     if (!singular) {
         x = std::atan2(m[2][1], m[2][2]);
-        y = std::atan2(-m[2][0],  sy);
-        z = std::atan2(m[1][0],  m[0][0]);
+        y = std::atan2(-m[2][0], sy);
+        z = std::atan2(m[1][0], m[0][0]);
     } else {                 // gimbal lock
         x = std::atan2(-m[1][2], m[1][1]);
-        y = std::atan2(-m[2][0],  sy);
+        y = std::atan2(-m[2][0], sy);
         z = 0.0f;
     }
     return glm::vec3(x, y, z);     // (γ,β,α)
@@ -63,13 +63,36 @@ namespace Objects {
         }
     }
 
+    void CSG_tree::get_min_stack_order(Objects::Object *object) {
+        assert((object->left == nullptr && object->right == nullptr) ||
+               (object->left != nullptr && object->right != nullptr));
+        if (object->left != nullptr) {
+            get_min_stack_order(object->left);
+            get_min_stack_order(object->right);
+        }
+        if (object->left == nullptr) {
+            object->max_stack_length = 1;
+        } else {
+            assert(object->left != nullptr && object->right != nullptr);
+            int first_left_length = std::max(1 + object->right->max_stack_length, object->left->max_stack_length);
+            int first_right_length = std::max(1 + object->left->max_stack_length, object->right->max_stack_length);
+            object->first_left = first_left_length <= first_right_length;
+            object->max_stack_length = std::min(first_left_length, first_right_length);
+        }
+    }
+
     void CSG_tree::generate_texture_data_postorder(Objects::Object *object,
                                                    std::vector<std::vector<float>> &textureData) {
+        assert((object->left == nullptr && object->right == nullptr) ||
+               (object->left != nullptr && object->right != nullptr));
         if (object->left != nullptr) {
-            generate_texture_data_postorder(object->left, textureData);
-        }
-        if (object->right != nullptr) {
-            generate_texture_data_postorder(object->right, textureData);
+            if (object->first_left) {
+                generate_texture_data_postorder(object->left, textureData);
+                generate_texture_data_postorder(object->right, textureData);
+            } else {
+                generate_texture_data_postorder(object->right, textureData);
+                generate_texture_data_postorder(object->left, textureData);
+            }
         }
         textureData.push_back(object->packObjectToTextureData());
     }
@@ -87,8 +110,13 @@ namespace Objects {
             }
         }
         // postorder traversal
+        get_min_stack_order(root);
         std::vector<std::vector<float>> textureData;
         generate_texture_data_postorder(root, textureData);
+        if (root->max_stack_length > 8) {
+            std::cout << "[Error] Oversized stack.Max stack length: " << root->max_stack_length << std::endl;
+            assert(false);
+        }
         return textureData;
     }
 
@@ -144,15 +172,14 @@ namespace Objects {
     Object *CSG_tree::create_subtract(Object *left, Object *right) {
         auto *difference = new Object(DIFFERENCE, {1.0f, 1.0f, 1.0f, 1.0f}, {}, left, right);
         object_list.push_back(difference);
-     
+
         return difference;
     }
 
-    Object* CSG_tree::create_plane(Color color,
-                               glm::vec3 normal,  
-                               float     h)       
-    {
-        auto* plane = new Object(PLANE, color, {normal.x, normal.y, normal.z, -h});
+    Object *CSG_tree::create_plane(Color color,
+                                   glm::vec3 normal,
+                                   float h) {
+        auto *plane = new Object(PLANE, color, {normal.x, normal.y, normal.z, -h});
         object_list.push_back(plane);
         return plane;
     }
@@ -247,42 +274,40 @@ namespace Objects {
         }
     }
 
-    void Object::rotate(const glm::vec3& axis,
-                    float angleRad,
-                    const glm::vec3& pivot)
-    {
+    void Object::rotate(const glm::vec3 &axis,
+                        float angleRad,
+                        const glm::vec3 &pivot) {
         glm::mat4 R4 = glm::rotate(glm::mat4(1.0f), angleRad, glm::normalize(axis));
-        glm::mat3 R  = glm::mat3(R4);
+        glm::mat3 R = glm::mat3(R4);
 
-        auto apply = [&](float& x, float& y, float& z)
-        {
+        auto apply = [&](float &x, float &y, float &z) {
             glm::vec3 p(x, y, z);
             p = glm::vec3(R * glm::vec4(p - pivot, 1.0f)) + pivot;
-            x = p.x;  y = p.y;  z = p.z;
+            x = p.x;
+            y = p.y;
+            z = p.z;
         };
 
-        switch (type)
-        {
+        switch (type) {
             case SPHERE:
                 apply(pos_args[0], pos_args[1], pos_args[2]);
                 break;
 
-            case CUBOID:
-            {
+            case CUBOID: {
                 apply(pos_args[0], pos_args[1], pos_args[2]);
 
                 float alpha = pos_args[6];
-                float beta  = pos_args[7];
+                float beta = pos_args[7];
                 float gamma = pos_args[8];
 
                 glm::mat3 M_old = glm::mat3(
-                    glm::rotate(glm::mat4(1.0f), alpha, glm::vec3(0,0,1)) *
-                    glm::rotate(glm::mat4(1.0f), beta,  glm::vec3(0,1,0)) *
-                    glm::rotate(glm::mat4(1.0f), gamma, glm::vec3(1,0,0))
+                        glm::rotate(glm::mat4(1.0f), alpha, glm::vec3(0, 0, 1)) *
+                        glm::rotate(glm::mat4(1.0f), beta, glm::vec3(0, 1, 0)) *
+                        glm::rotate(glm::mat4(1.0f), gamma, glm::vec3(1, 0, 0))
                 );
 
                 glm::mat3 M_new = R * M_old;
-                glm::vec3 eul   = matrixToEulerZYX(M_new);
+                glm::vec3 eul = matrixToEulerZYX(M_new);
 
                 pos_args[6] = eul.z;   // α'
                 pos_args[7] = eul.y;   // β'
@@ -293,15 +318,16 @@ namespace Objects {
             case CONE:
             case CYLINDER:
                 for (int i = 0; i < 6; i += 3)
-                    apply(pos_args[i], pos_args[i+1], pos_args[i+2]);
+                    apply(pos_args[i], pos_args[i + 1], pos_args[i + 2]);
                 break;
 
             case TETRAHEDRON:
                 for (int i = 0; i < 12; i += 3)
-                    apply(pos_args[i], pos_args[i+1], pos_args[i+2]);
+                    apply(pos_args[i], pos_args[i + 1], pos_args[i + 2]);
                 break;
 
-            default: break;
+            default:
+                break;
         }
     }
 
