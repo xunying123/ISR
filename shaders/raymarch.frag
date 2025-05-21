@@ -7,6 +7,7 @@ uniform float iTime;                // 时间（可做动画）
 
 uniform samplerBuffer objectBuffer; // TBO 采样器
 uniform int           numObjects;   // 物体数量
+uniform samplerCube uEnvMap; 
 
 float sdSphere(vec3 p, float r)
 {
@@ -365,7 +366,16 @@ void main()
     float t = march(ro, rd, hitPos, baseCol);
     if (t < 0.0)                        // background
     {
-        FragColor = vec4(0.0);
+        vec3 env = textureLod(uEnvMap, rd, 0.0).rgb;   // 线性 HDR
+
+        /* 曝光 + Tone-map + γ，与场景同流程 */
+        float exposure = 0.9;
+        env *= exposure;
+        env  = (env * (2.51*env + 0.03)) /
+               (env * (2.43*env + 0.59) + 0.14);
+
+        env  = pow(env, vec3(1.0/2.2));                // sRGB
+        FragColor = vec4(env, 1.0);
         return;
     }
 

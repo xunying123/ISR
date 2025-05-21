@@ -1,4 +1,5 @@
 // main.cpp
+#define STB_IMAGE_IMPLEMENTATION
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/ext/vector_float3.hpp>
@@ -9,6 +10,11 @@
 #include "objects.h"
 #include <fstream>
 #include <sstream>
+#include "stb_image.h" 
+#include <string> 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glad/glad.h>
+#include <glm/glm.hpp>
 
 std::string loadShader(const char *path) {
     std::ifstream ifs(path, std::ios::binary);
@@ -19,21 +25,6 @@ std::string loadShader(const char *path) {
     std::ostringstream oss;
     oss << ifs.rdbuf();
     return oss.str();
-}
-
-GLuint compileShader(GLenum type, const char *src) {
-    GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, nullptr);
-    glCompileShader(s);
-
-    GLint ok = 0;
-    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-    if (!ok) {
-        char log[1024];
-        glGetShaderInfoLog(s, 1024, nullptr, log);
-        std::cerr << "着色器编译失败:\n" << log << '\n';
-    }
-    return s;
 }
 
 GLuint linkProgram(GLuint vs, GLuint fs) {
@@ -52,6 +43,143 @@ GLuint linkProgram(GLuint vs, GLuint fs) {
     glDeleteShader(vs);
     glDeleteShader(fs);
     return p;
+}
+
+
+GLuint compileShader(GLenum type, const char *src) {
+    GLuint s = glCreateShader(type);
+    glShaderSource(s, 1, &src, nullptr);
+    glCompileShader(s);
+
+    GLint ok = 0;
+    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    if (!ok) {
+        char log[1024];
+        glGetShaderInfoLog(s, 1024, nullptr, log);
+        std::cerr << "着色器编译失败:\n" << log << '\n';
+    }
+    return s;
+}
+
+static const char* vsSrc = R"(#version 330 core
+layout(location=0) in vec3 aPos;
+out vec3 vDir;
+uniform mat4 uView;   // 每个面单独传
+void main(){
+    vDir = mat3(uView)*aPos;    // 方向向量 (已旋转到当前面)
+    gl_Position = vec4(aPos,1.0);
+})";
+
+static const char* fsSrc = R"(#version 330 core
+in  vec3 vDir;
+out vec4 FragColor;
+uniform sampler2D equirect;    // 已加载的 2D HDR
+const float PI = 3.1415926;
+void main(){
+    vec3 d = normalize(vDir);
+    float u = atan(d.z, d.x) / (2.0*PI) + 0.5;
+    float v = asin(clamp(d.y,-1,1)) / PI + 0.5;
+    vec3 hdr = textureLod(equirect, vec2(u,1.0-v), 0.0).rgb; // 反转 v
+    FragColor = vec4(hdr,1.0);
+})";
+
+/* -------------------------------------------------------------- */
+GLuint equirectToCubemap(const std::string& path, int cubemapSize = 1024)
+{
+    /* 1. 读取 HDR 到 2D 纹理 */
+    int w,h,comp;
+    float* data = stbi_loadf(path.c_str(), &w,&h,&comp, 0);
+    if(!data){ fprintf(stderr,"load %s fail\n",path.c_str()); return 0; }
+
+    GLuint tex2D; glGenTextures(1, &tex2D);
+    glBindTexture(GL_TEXTURE_2D, tex2D);
+    GLenum fmt = (comp==3) ? GL_RGB : GL_RGBA;
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,w,h,0,fmt,GL_FLOAT,data);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D,0);
+    stbi_image_free(data);
+
+    /* 2. 创建空 Cubemap */
+    GLuint cube; glGenTextures(1,&cube);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,cube);
+    for(int i=0;i<6;++i)
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,
+                     cubemapSize,cubemapSize,0,GL_RGB,GL_FLOAT,nullptr);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
+
+    /* 3. FBO 与着色器 */
+    GLuint fbo; glGenFramebuffers(1,&fbo);
+    GLuint rbo; glGenRenderbuffers(1,&rbo);           // 无需深度
+    glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER,rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,cubemapSize,cubemapSize);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,rbo);
+
+    GLuint vs = compileShader(GL_VERTEX_SHADER,vsSrc);
+    GLuint fs = compileShader(GL_FRAGMENT_SHADER,fsSrc);
+    GLuint prog = linkProgram(vs,fs);
+    glDeleteShader(vs); glDeleteShader(fs);
+
+    GLuint vao,vbo;
+    float cubeVerts[] = {
+        -1,-1,-1,  1,-1,-1,  1, 1,-1,  1, 1,-1, -1, 1,-1, -1,-1,-1, // -Z
+        -1,-1, 1,  1,-1, 1,  1, 1, 1,  1, 1, 1, -1, 1, 1, -1,-1, 1, // +Z
+        -1, 1,-1,  1, 1,-1,  1, 1, 1,  1, 1, 1, -1, 1, 1, -1, 1,-1, // +Y
+        -1,-1,-1,  1,-1,-1,  1,-1, 1,  1,-1, 1, -1,-1, 1, -1,-1,-1, // -Y
+        1,-1,-1,  1,-1, 1,  1, 1, 1,  1, 1, 1,  1, 1,-1,  1,-1,-1, // +X
+       -1,-1,-1, -1,-1, 1, -1, 1, 1, -1, 1, 1, -1, 1,-1, -1,-1,-1  // -X
+    };
+    glGenVertexArrays(1,&vao);
+    glGenBuffers(1,&vbo);
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER,vbo);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(cubeVerts),cubeVerts,GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),0);
+
+    /* 4. 视矩阵 (lookAt 六方向) */
+    glm::mat4 views[6] = {
+        glm::lookAt(glm::vec3(0), glm::vec3(-1,0,0), glm::vec3(0,-1,0)), // +X
+        glm::lookAt(glm::vec3(0), glm::vec3(1,0,0), glm::vec3(0,-1,0)), // -X
+        glm::lookAt(glm::vec3(0), glm::vec3(0, 1,0), glm::vec3(0,0,1)),  // +Y
+        glm::lookAt(glm::vec3(0), glm::vec3(0,-1,0), glm::vec3(0,0,-1)), // -Y
+        glm::lookAt(glm::vec3(0), glm::vec3(0,0, 1), glm::vec3(0,-1,0)), // +Z
+        glm::lookAt(glm::vec3(0), glm::vec3(0,0,-1), glm::vec3(0,-1,0))  // -Z
+    };
+
+    /* 5. 渲染到 6 面 */
+    glUseProgram(prog);
+    glUniform1i(glGetUniformLocation(prog,"equirect"),0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D,tex2D);
+
+    glViewport(0,0,cubemapSize,cubemapSize);
+    for(int i=0;i<6;++i){
+        glUniformMatrix4fv(glGetUniformLocation(prog,"uView"),1,GL_FALSE,&views[i][0][0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,cube,0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES,0,36);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+
+    glDeleteVertexArrays(1,&vao);
+    glDeleteBuffers(1,&vbo);
+    glDeleteProgram(prog);
+    glDeleteTextures(1,&tex2D);
+    glDeleteRenderbuffers(1,&rbo);
+    glDeleteFramebuffers(1,&fbo);
+
+    /* 6. 生成 Mip-map 后返回 cubemap 句柄 */
+    glBindTexture(GL_TEXTURE_CUBE_MAP,cube);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    return cube;
 }
 
 int main() {
@@ -77,12 +205,22 @@ int main() {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
     glEnableVertexAttribArray(0);
 
+    GLuint envTex = equirectToCubemap("shaders/glacier.hdr", 1024);                         
+
     /* ---------- 3. 编译 / 链接着色器 ---------- */
     std::string vsrc = loadShader("shaders/raymarch.vert");
     std::string fsrc = loadShader("shaders/raymarch.frag");
     GLuint vs = compileShader(GL_VERTEX_SHADER, vsrc.c_str());
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsrc.c_str());
     GLuint prog = linkProgram(vs, fs);
+
+    glUseProgram(prog);
+
+    /* ① 告诉着色器：uEnvMap 来自 texture unit 1 */
+    glUniform1i(glGetUniformLocation(prog, "uEnvMap"), 1);
+
+    /* ② 依旧把 objectBuffer 绑定到槽 0（已有） */
+    glUniform1i(glGetUniformLocation(prog, "objectBuffer"), 0);
 
     /* ---------- 4. 在 CPU 端创建任意数量的物体 ---------- */
     using namespace Objects;
@@ -113,9 +251,9 @@ int main() {
     //                                 glm::vec3(0.5f, 0.f, 0.f),
     //                                 glm::vec3(0.f, 0.866f, 0.f),
     //                                 glm::vec3(0.f, 0.289f, 0.816f));
-    // auto* box = tree.create_cuboid({1,0,0,1},
-    //                            {0,1,0}, 2,2,2,
-    //                            0,0,0);   // α,β,γ=0
+    auto* box = tree.create_cuboid({1,0,0,1},
+                               {0,1,0}, 2,2,2,
+                               1,1,1);   // α,β,γ=0
     // cpuObjs.push_back(create_sphere({0.2f,0.8f,0.2f,1},
     //                                 glm::vec3(0.f,0.f,0.f),
     //                                 0.5f));            
@@ -125,6 +263,7 @@ int main() {
    auto* sph = tree.create_sphere({1.0f,0.3f,0.3f,1.0f},
                               {-1.0f,0.0f,0.0f}, 1.0f);
    sph->translate({0.0f,-0.5f,0.0f});
+   auto* new_bee = tree.create_union(box, sph); // 取并集
 //
 //    /* 2. 橙色圆锥（底面中心固定在地面 (-3,0,0)）*/
     auto* cone = tree.create_cone({1.0f,0.6f,0.2f,1.0f},
@@ -134,8 +273,8 @@ int main() {
 //
 //    /* 3. 蓝色圆柱（竖直，scale 放大 1.5 倍）*/
    auto* cyl = tree.create_cylinder({0.2f,0.6f,1.0f,1.0f},
-                                { 2.0f,0.0f, 2.0f},    // 端点 A (支点)
-                                { 2.0f,2.0f, 2.0f},    // 端点 B
+                                { 2.0f,0.0f, 1.0f},    // 端点 A (支点)
+                                { 2.0f,1.5f, -0.5f},    // 端点 B
                                 0.4f);                 // 半径
    cyl->scale(1.5f);
    cyl->translate({0.0f,-1.0f,0.0f});      // 向上抬 0.5
@@ -147,7 +286,6 @@ int main() {
     for (auto &d: data) {
         gpuData.insert(gpuData.end(), d.begin(), d.end());
     }
-
 
     /* ---------- 6. 生成 TBO + 纹理 ---------- */
     GLuint tbo, tex;
@@ -173,6 +311,9 @@ int main() {
         /* 7-2 绑定纹理并设置 uniform */
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_BUFFER, tex);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envTex);
 
         glUseProgram(prog);
         glUniform1i(glGetUniformLocation(prog, "objectBuffer"), 0);              // 绑定槽 0
