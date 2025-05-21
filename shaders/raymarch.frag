@@ -3,16 +3,17 @@ out vec4 FragColor;
 in  vec2 fragCoord;
 
 uniform vec2  iResolution;          // 屏幕分辨率
-uniform float iTime;                // 时间（可做动画）
 
 uniform samplerBuffer objectBuffer; // TBO 采样器
 uniform int           numObjects;   // 物体数量
 uniform samplerCube uEnvMap; 
+uniform int         uEnvEnable;
 
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
 }
+
 float sdBox(vec3 p, float alpha, float beta, float gamma, vec3 b)
 {
     // rotate around Z axis
@@ -101,9 +102,7 @@ float sdTriangle(vec3 p, vec3 a, vec3 b, vec3 c) {
     return s * sqrt(sqDist);
 }
 
-float sdTetrahedron( vec3 p,
-                     vec3 v0, vec3 v1,
-                     vec3 v2, vec3 v3 )
+float sdTetrahedron( vec3 p, vec3 v0, vec3 v1, vec3 v2, vec3 v3 )
 {
     vec3 verts[4] = vec3[]( v0, v1, v2, v3 );
     int faces[4][3] = int[4][3](
@@ -295,26 +294,6 @@ float softShadow(vec3 ro, vec3 rd, float mint, float maxt)
     return clamp(res, 0.0, 1.0);
 }
 
-/* ============================================================
-   点光 Soft Shadow  (ro, rd, distMax)
-   ============================================================ */
-float softShadowPoint(vec3 ro, vec3 rd, float distMax)
-{
-    float res = 1.0;
-    float t   = 0.05;                         // 起始步
-    for(int i = 0; i < 128 && t < distMax; ++i)
-    {
-        vec3  pos = ro + rd * t;
-        vec3  dump;
-        float h   = map(pos, dump);
-        if(h < 5e-5) return 0.0;
-        res = min(res, 6.0 * h / t);
-        t  += clamp(h, 0.02, 0.20);
-    }
-    return clamp(res, 0.0, 1.0);
-}
-
-
 float calcAO(vec3 p, vec3 n)
 {
     float occ = 0.0;          // 累积遮挡量
@@ -332,7 +311,6 @@ float calcAO(vec3 p, vec3 n)
     }
     return clamp(1.0 - occ, 0.0, 1.0);     // 1→完全暴露, 0→全遮
 }
-
 
 float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
 {
@@ -366,13 +344,12 @@ void main()
     float t = march(ro, rd, hitPos, baseCol);
     if (t < 0.0)                        // background
     {
-        vec3 env = textureLod(uEnvMap, rd, 0.0).rgb;   // 线性 HDR
+        vec3 env = (uEnvEnable == 1) ? textureLod(uEnvMap, rd, 0.0).rgb : vec3(0.0);                         // 无 → 纯黑
 
         /* 曝光 + Tone-map + γ，与场景同流程 */
         float exposure = 0.9;
         env *= exposure;
-        env  = (env * (2.51*env + 0.03)) /
-               (env * (2.43*env + 0.59) + 0.14);
+        env  = (env * (2.51*env + 0.03)) / (env * (2.43*env + 0.59) + 0.14);
 
         env  = pow(env, vec3(1.0/2.2));                // sRGB
         FragColor = vec4(env, 1.0);
@@ -411,16 +388,13 @@ void main()
 
     /* ========== 基色累加 ========== */
     vec3 color =
-        baseCol * (hemi * 0.6 * ao                       // 环境光 × AO
-                + lightCol * (0.9*kDiff + 0.4*fDiff))   // 两盏方向光漫反射
-        + lightCol * 0.4 * (kSpec + fSpec);                // 高光
+        baseCol * (hemi * 0.6 * ao + lightCol * (0.9*kDiff + 0.4*fDiff)) + lightCol * 0.4 * (kSpec + fSpec);
 
     /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
     float exposure = 0.9;                                   // 可调曝光
     color *= exposure;
 
-    color = (color * (2.51*color + 0.03)) /                 // ACES 近似
-            (color * (2.43*color + 0.59) + 0.14);
+    color = (color * (2.51*color + 0.03)) / (color * (2.43*color + 0.59) + 0.14);
 
         /* ====== 提升饱和度 ====== */
     float sat = 1.5;                               // 1 = 原饱和度

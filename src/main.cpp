@@ -45,7 +45,6 @@ GLuint linkProgram(GLuint vs, GLuint fs) {
     return p;
 }
 
-
 GLuint compileShader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, nullptr);
@@ -218,6 +217,8 @@ int main() {
 
     /* ① 告诉着色器：uEnvMap 来自 texture unit 1 */
     glUniform1i(glGetUniformLocation(prog, "uEnvMap"), 1);
+
+    glUniform1i(glGetUniformLocation(prog,"uEnvEnable"), 0);   // 1 = ON
 
     /* ② 依旧把 objectBuffer 绑定到槽 0（已有） */
     glUniform1i(glGetUniformLocation(prog, "objectBuffer"), 0);
