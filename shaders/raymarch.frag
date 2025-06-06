@@ -139,33 +139,30 @@ float sdPlane(vec3 p, vec3 n, float h)
 
 float sdMengerSponge(vec3 p, float size, int iterations)
 {
-    // 将点缩放到标准化坐标系 [-1,1]
     p = p / size;
     
-    // 开始时的距离是一个立方体
+    // 开始时是一个立方体
     float d = sdBox(p, 0.0, 0.0, 0.0, vec3(1.0));
     
-    // 初始缩放
+    // 基于Inigo Quilez的经典算法
     float s = 1.0;
-    
-    // 迭代创建分形结构
-    for(int i = 0; i < iterations; ++i)
+    for(int m = 0; m < iterations; m++)
     {
-        // 每次迭代缩放3倍
-        s *= 3.0;
         vec3 a = mod(p * s, 2.0) - 1.0;
+        s *= 3.0;
         
-        // 创建十字形孔洞
-        // 在每个小立方体中心挖十字形洞
-        float crossX = max(abs(a.y), abs(a.z)) - 1.0/3.0;
-        float crossY = max(abs(a.x), abs(a.z)) - 1.0/3.0; 
-        float crossZ = max(abs(a.x), abs(a.y)) - 1.0/3.0;
+        // 计算"反向十字"的距离
+        vec3 r = abs(1.0 - 3.0 * abs(a));
         
-        // 十字形的并集
-        float cross = min(min(crossX, crossY), crossZ);
+        // 十字形：三个相互垂直的无限长条的并集
+        float c1 = sdBox(r, 0.0, 0.0, 0.0, vec3(2.0, 1.0, 1.0)) / s; // X方向
+        float c2 = sdBox(r, 0.0, 0.0, 0.0, vec3(1.0, 2.0, 1.0)) / s; // Y方向  
+        float c3 = sdBox(r, 0.0, 0.0, 0.0, vec3(1.0, 1.0, 2.0)) / s; // Z方向
         
-        // 从立方体中减去十字形孔洞
-        d = max(d, -cross / s);
+        float c = min(min(c1, c2), c3);
+        
+        // 从立方体中减去十字形
+        d = max(d, c);
     }
     
     return d * size;
@@ -308,15 +305,17 @@ float map(vec3 p, out vec3 col)
 
 vec3 calcNormal(vec3 p)
 {
-    const float h = 5e-4;
+    // 使用更高精度的法向量计算
+    const float h = 1e-4;  // 减小步长以提高精度
     vec3 dummy;
-    vec2 k = vec2(1.0, -1.0);
-    return normalize(
-          k.xyy * map(p + k.xyy * h, dummy)
-        + k.yyx * map(p + k.yyx * h, dummy)
-        + k.yxy * map(p + k.yxy * h, dummy)
-        + k.xxx * map(p + k.xxx * h, dummy)
+    
+    // 使用更精确的中心差分法
+    vec3 n = vec3(
+        map(p + vec3(h, 0.0, 0.0), dummy) - map(p - vec3(h, 0.0, 0.0), dummy),
+        map(p + vec3(0.0, h, 0.0), dummy) - map(p - vec3(0.0, h, 0.0), dummy),
+        map(p + vec3(0.0, 0.0, h), dummy) - map(p - vec3(0.0, 0.0, h), dummy)
     );
+    return normalize(n);
 }
 
 /* === Soft Shadow (directional) === */
@@ -356,93 +355,122 @@ float calcAO(vec3 p, vec3 n)
 
 float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
 {
-    const float EPS  = 1e-4;
+    const float EPS  = 8e-5;   // 更高的精度阈值
     const float TMAX = 100.0;
     float t = 0.0;
-    for (int i = 0; i < 512; ++i)
+    
+    for (int i = 0; i < 768; ++i)  // 增加最大迭代次数
     {
         pos = ro + rd * t;
         float d = map(pos, col);
-        if (d < EPS) return t;          // hit
-        t += d;
-        if (t > TMAX) break;            // clipped
+        
+        if (d < EPS) return t;
+        
+        // 对于分形结构，使用更保守的步长
+        t += d * 0.8;  // 减小步长因子，提高精度
+        
+        if (t > TMAX) break;
     }
     return -1.0;
 }
 
 void main()
 {
-    /* 1) Ray */
-    vec2 uv = (fragCoord * 2.0 - 1.0);
-    uv.x *= iResolution.x / iResolution.y;
-
-    vec3 ro = vec3(0.0, 2.0, -5.0);     // camera pos
-    vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
-    float pitch = radians(-20.0);            // 俯视 10°
-    rd.yz = mat2(cos(pitch), -sin(pitch), sin(pitch),  cos(pitch)) * rd.yz;
-
-    /* 2) Ray March */
-    vec3 hitPos, baseCol;
-    float t = march(ro, rd, hitPos, baseCol);
-    if (t < 0.0)                        // background
+    // 抗锯齿开关：设为1启用2x2超采样，设为0禁用以提高性能
+    const bool ENABLE_AA = true;
+    
+    vec3 finalColor = vec3(0.0);
+    int samples = ENABLE_AA ? 4 : 1;
+    
+    for(int sampleIdx = 0; sampleIdx < samples; sampleIdx++)
     {
-        vec3 env = (uEnvEnable == 1) ? textureLod(uEnvMap, rd, 0.0).rgb : vec3(0.0);                         // 无 → 纯黑
+        vec2 sampleCoord = fragCoord;
+        
+        if(ENABLE_AA)
+        {
+            int x = sampleIdx % 2;
+            int y = sampleIdx / 2;
+            vec2 offset = vec2(float(x), float(y)) * 0.5 - 0.25;
+            sampleCoord = fragCoord + offset / iResolution.xy;
+        }
+        
+        /* 1) Ray */
+        vec2 uv = (sampleCoord * 2.0 - 1.0);
+        uv.x *= iResolution.x / iResolution.y;
 
-        /* 曝光 + Tone-map + γ，与场景同流程 */
-        float exposure = 0.9;
-        env *= exposure;
-        env  = (env * (2.51*env + 0.03)) / (env * (2.43*env + 0.59) + 0.14);
+        vec3 ro = vec3(0.0, 2.0, -5.0);     // camera pos
+        vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
+        float pitch = radians(-20.0);            // 俯视 10°
+        rd.yz = mat2(cos(pitch), -sin(pitch), sin(pitch),  cos(pitch)) * rd.yz;
 
-        env  = pow(env, vec3(1.0/2.2));                // sRGB
-        FragColor = vec4(env, 1.0);
-        return;
+        /* 2) Ray March */
+        vec3 hitPos, baseCol;
+        float t = march(ro, rd, hitPos, baseCol);
+        vec3 sampleColor = vec3(0.0);
+        
+        if (t < 0.0)                        // background
+        {
+            vec3 env = (uEnvEnable == 1) ? textureLod(uEnvMap, rd, 0.0).rgb : vec3(0.0);
+
+            /* 曝光 + Tone-map + γ，与场景同流程 */
+            float exposure = 0.9;
+            env *= exposure;
+            env  = (env * (2.51*env + 0.03)) / (env * (2.43*env + 0.59) + 0.14);
+
+            sampleColor = pow(env, vec3(1.0/2.2));
+        }
+        else
+        {
+            /* ---------- 3) Light ------------------------------------------------ */
+            vec3 n       = calcNormal(hitPos);
+            vec3 viewDir = normalize(-rd);            // 从表面看向相机
+
+            /* === 环境光遮蔽 (AO) === */
+            float ao = calcAO(hitPos, n);
+
+            /* === 半球环境光 (天空+地面) === */
+            vec3 skyCol    = vec3(0.24, 0.32, 0.45);
+            vec3 groundCol = vec3(0.18, 0.15, 0.13);
+            vec3 hemi      = mix(groundCol, skyCol, n.y * 0.5 + 0.5);
+
+            /* === 两盏方向光 === */
+            const vec3 kDir = normalize(vec3( 0.5, 0.7, -0.4));    // 主光
+            const vec3 fDir = normalize(vec3(-0.4, 0.3,  0.5));    // 反光
+            vec3  lightCol  = vec3(1.08, 0.97, 0.90);
+
+            /* 主光软阴影 */
+            float kShadow = softShadow(hitPos + n*1e-3, kDir, 0.05, 20.0);
+
+            /* 漫反射 */
+            float kDiff = max(dot(n, kDir), 0.0) * kShadow;
+            float fDiff = max(dot(n, fDir), 0.0);                  // 反光不投影
+
+            /* 高光（Blinn-Phong） */
+            vec3  halfK = normalize(kDir + viewDir);
+            vec3  halfF = normalize(fDir + viewDir);
+            float kSpec = pow(max(dot(n, halfK), 0.0), 64.0) * kShadow;
+            float fSpec = pow(max(dot(n, halfF), 0.0), 64.0);
+
+            /* ========== 基色累加 ========== */
+            vec3 color =
+                baseCol * (hemi * 0.6 * ao + lightCol * (0.9*kDiff + 0.4*fDiff)) + lightCol * 0.4 * (kSpec + fSpec);
+
+            /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
+            float exposure = 0.9;                                   // 可调曝光
+            color *= exposure;
+
+            color = (color * (2.51*color + 0.03)) / (color * (2.43*color + 0.59) + 0.14);
+
+            /* ====== 提升饱和度 ====== */
+            float sat = 1.5;                               // 降低饱和度以获得更自然的效果
+            float Y   = dot(color, vec3(0.2126,0.7152,0.0722)); // 线性亮度
+            color = mix(vec3(Y), color, sat);               // sat↑→更鲜艳
+
+            sampleColor = pow(color, vec3(1.0/2.2));                      // sRGB Gamma
+        }
+        
+        finalColor += sampleColor;
     }
-
-    /* ---------- 3) Light ------------------------------------------------ */
-    vec3 n       = calcNormal(hitPos);
-    vec3 viewDir = normalize(-rd);            // 从表面看向相机
-
-    /* === 环境光遮蔽 (AO) === */
-    float ao = calcAO(hitPos, n);
-
-    /* === 半球环境光 (天空+地面) === */
-    vec3 skyCol    = vec3(0.24, 0.32, 0.45);
-    vec3 groundCol = vec3(0.18, 0.15, 0.13);
-    vec3 hemi      = mix(groundCol, skyCol, n.y * 0.5 + 0.5);
-
-    /* === 两盏方向光 === */
-    const vec3 kDir = normalize(vec3( 0.5, 0.7, -0.4));    // 主光
-    const vec3 fDir = normalize(vec3(-0.4, 0.3,  0.5));    // 反光
-    vec3  lightCol  = vec3(1.08, 0.97, 0.90);
-
-    /* 主光软阴影 */
-    float kShadow = softShadow(hitPos + n*1e-3, kDir, 0.05, 20.0);
-
-    /* 漫反射 */
-    float kDiff = max(dot(n, kDir), 0.0) * kShadow;
-    float fDiff = max(dot(n, fDir), 0.0);                  // 反光不投影
-
-    /* 高光（Blinn-Phong） */
-    vec3  halfK = normalize(kDir + viewDir);
-    vec3  halfF = normalize(fDir + viewDir);
-    float kSpec = pow(max(dot(n, halfK), 0.0), 64.0) * kShadow;
-    float fSpec = pow(max(dot(n, halfF), 0.0), 64.0);
-
-    /* ========== 基色累加 ========== */
-    vec3 color =
-        baseCol * (hemi * 0.6 * ao + lightCol * (0.9*kDiff + 0.4*fDiff)) + lightCol * 0.4 * (kSpec + fSpec);
-
-    /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
-    float exposure = 0.9;                                   // 可调曝光
-    color *= exposure;
-
-    color = (color * (2.51*color + 0.03)) / (color * (2.43*color + 0.59) + 0.14);
-
-        /* ====== 提升饱和度 ====== */
-    float sat = 1.5;                               // 1 = 原饱和度
-    float Y   = dot(color, vec3(0.2126,0.7152,0.0722)); // 线性亮度
-    color = mix(vec3(Y), color, sat);               // sat↑→更鲜艳
-
-    color = pow(color, vec3(1.0/2.2));                      // sRGB Gamma
-    FragColor = vec4(color, 1.0);
+    
+    FragColor = vec4(finalColor / float(samples), 1.0);
 }

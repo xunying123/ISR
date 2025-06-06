@@ -230,37 +230,35 @@ int main() {
                                  {0.0f,1.0f,0.0f},     // 法向量朝 +Y
                                  -1.0f);                // y = -1 → dot(p,n)+h=0
 
-    // 创建不同迭代次数的Menger sponge来展示分形效果
-    
-    // 迭代0次 - 普通立方体
     auto* menger0 = tree.create_menger_sponge({1.0f, 0.2f, 0.2f, 1.0f},   // 红色
                                            glm::vec3(-6.0f, 1.0f, 0.0f),   
                                            1.5f,                          
-                                           0);                            
+                                           1);                            
 
     // 迭代1次
     auto* menger1 = tree.create_menger_sponge({0.8f, 0.4f, 0.2f, 1.0f},   // 橙色
                                            glm::vec3(-2.0f, 1.0f, 0.0f),   
                                            1.5f,                          
-                                           1);                            
+                                           2);                            
 
     // 迭代2次
     auto* menger2 = tree.create_menger_sponge({0.6f, 0.6f, 0.2f, 1.0f},   // 黄色
                                            glm::vec3(2.0f, 1.0f, 0.0f),    
                                            1.5f,                          
-                                           2);                            
+                                           3);                            
 
     // 迭代3次
     auto* menger3 = tree.create_menger_sponge({0.2f, 0.8f, 0.4f, 1.0f},   // 绿色
                                            glm::vec3(6.0f, 1.0f, 0.0f),    
                                            1.5f,                          
-                                           3);
+                                           4);
 
     // 在背景添加一个大的Menger sponge
     auto* menger_bg = tree.create_menger_sponge({0.3f, 0.3f, 0.8f, 0.8f}, // 半透明蓝色
                                              glm::vec3(0.0f, 4.0f, 8.0f),    
                                              4.0f,                          
-                                             2);
+                                             3);
+
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;

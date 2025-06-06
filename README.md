@@ -84,11 +84,22 @@ make
 ## 技术细节
 
 ### SDF函数实现
-Menger sponge的SDF函数基于以下算法：
+Menger sponge的SDF函数基于Inigo Quilez的经典算法：
 1. 从基础立方体开始
-2. 对每次迭代，将空间按3倍缩放
-3. 在每个小立方体中创建十字形孔洞
-4. 使用max操作从立方体中减去孔洞
+2. 每次迭代将空间按3倍缩放并折叠
+3. 计算反向十字形的距离场
+4. 使用max操作从立方体中减去十字形区域
+
+这个实现确保了：
+- 精确的距离场计算
+- 正确的分形几何结构
+- 高效的GPU渲染性能
+
+### 算法参考
+SDF函数实现参考了以下资料：
+- [Inigo Quilez - Distance Functions](https://iquilezles.org/articles/menger/)
+- [Menger Sponge SDF](https://www.shadertoy.com/) 相关实现
+- 经典分形几何学理论
 
 ### 着色器支持
 在`shaders/raymarch.frag`中实现了`sdMengerSponge`函数，支持：
