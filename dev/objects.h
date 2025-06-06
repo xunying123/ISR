@@ -16,6 +16,7 @@ namespace Objects {
         UNION,
         DIFFERENCE,
         PLANE,
+        MENGER_SPONGE,
     };
 
     struct Color {
@@ -80,6 +81,8 @@ namespace Objects {
 
         Object *create_plane(Color color,
                              glm::vec3 normal, float h);
+
+        Object *create_menger_sponge(Color color, glm::vec3 center, float size, int iterations);
 
         Object *create_intersection(Object *left, Object *right);
 

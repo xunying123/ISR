@@ -137,6 +137,39 @@ float sdPlane(vec3 p, vec3 n, float h)
     return dot(p, n) + h;  
 }
 
+float sdMengerSponge(vec3 p, float size, int iterations)
+{
+    // 将点缩放到标准化坐标系 [-1,1]
+    p = p / size;
+    
+    // 开始时的距离是一个立方体
+    float d = sdBox(p, 0.0, 0.0, 0.0, vec3(1.0));
+    
+    // 初始缩放
+    float s = 1.0;
+    
+    // 迭代创建分形结构
+    for(int i = 0; i < iterations; ++i)
+    {
+        // 每次迭代缩放3倍
+        s *= 3.0;
+        vec3 a = mod(p * s, 2.0) - 1.0;
+        
+        // 创建十字形孔洞
+        // 在每个小立方体中心挖十字形洞
+        float crossX = max(abs(a.y), abs(a.z)) - 1.0/3.0;
+        float crossY = max(abs(a.x), abs(a.z)) - 1.0/3.0; 
+        float crossZ = max(abs(a.x), abs(a.y)) - 1.0/3.0;
+        
+        // 十字形的并集
+        float cross = min(min(crossX, crossY), crossZ);
+        
+        // 从立方体中减去十字形孔洞
+        d = max(d, -cross / s);
+    }
+    
+    return d * size;
+}
 
 void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
 {
@@ -248,6 +281,15 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec3 n = t1.yzw;
         float h = t2.x;
         stack[stack_top] = vec4(curColor, sdPlane(p, n, h));
+        stack_top += 1;
+    }
+    else if (type == 9)                 /* ---------- MENGER_SPONGE ---------- */
+    {
+        vec3 center = t1.yzw;           // (pos0~2)
+        float size = t2.x;              // (pos3)
+        int iterations = int(t2.y + 0.5); // (pos4)
+        
+        stack[stack_top] = vec4(curColor, sdMengerSponge(p - center, size, iterations));
         stack_top += 1;
     }
 }

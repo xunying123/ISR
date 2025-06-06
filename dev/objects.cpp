@@ -184,10 +184,17 @@ namespace Objects {
         return plane;
     }
 
+    Object *CSG_tree::create_menger_sponge(Color color, glm::vec3 center, float size, int iterations) {
+        auto *menger = new Object(MENGER_SPONGE, color, {center.x, center.y, center.z, size, static_cast<float>(iterations)});
+        object_list.push_back(menger);
+        return menger;
+    }
+
     void Object::translate(const glm::vec3 &d) {
         switch (type) {
             case SPHERE:
             case CUBOID:
+            case MENGER_SPONGE:
                 pos_args[0] += d.x;
                 pos_args[1] += d.y;
                 pos_args[2] += d.z;
@@ -210,6 +217,9 @@ namespace Objects {
         switch (type) {
             case SPHERE:
                 pos_args[3] *= s;
+                break;
+            case MENGER_SPONGE:
+                pos_args[3] *= s;  // 缩放size参数
                 break;
             case CUBOID:
                 pos_args[3] *= s;
@@ -290,6 +300,7 @@ namespace Objects {
 
         switch (type) {
             case SPHERE:
+            case MENGER_SPONGE:
                 apply(pos_args[0], pos_args[1], pos_args[2]);
                 break;
 
