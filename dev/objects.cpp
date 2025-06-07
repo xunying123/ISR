@@ -28,7 +28,7 @@ namespace Objects {
         textureData[2] = color.g; // G
         textureData[3] = color.b; // B
         textureData[4] = color.a; // A
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < 28; ++i) {
             textureData[5 + i] = pos_args[i];
         }
         return textureData;
@@ -120,39 +120,41 @@ namespace Objects {
         return textureData;
     }
 
-    Object *CSG_tree::create_sphere(Color color, glm::vec3 center, float radius) {
-        auto *sphere = new Object(SPHERE, color, {center.x, center.y, center.z, radius});
+    Object *CSG_tree::create_sphere(Color color, glm::vec3 center, float radius, float texture, float para) {
+        auto *sphere = new Object(SPHERE, color, {center.x, center.y, center.z, radius, texture, para});
         object_list.push_back(sphere);
         return sphere;
     }
 
-    Object *CSG_tree::create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius) {
+    Object *CSG_tree::create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius, 
+                                   float texture, float para) {
         auto *cone = new Object(CONE, color, {center.x, center.y, center.z,
-                                              vertex.x, vertex.y, vertex.z, radius});
+                                              vertex.x, vertex.y, vertex.z, radius, texture, para});
         object_list.push_back(cone);
         return cone;
     }
 
-    Object *CSG_tree::create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius) {
+    Object *CSG_tree::create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius, 
+                                       float texture, float para) {
         auto *cylinder = new Object(CYLINDER, color, {center1.x, center1.y, center1.z,
-                                                      center2.x, center2.y, center2.z, radius});
+                                                      center2.x, center2.y, center2.z, radius, texture, para});
         object_list.push_back(cylinder);
         return cylinder;
     }
 
     Object *CSG_tree::create_cuboid(Color color, glm::vec3 center, float length, float width,
-                                    float height, float alpha, float beta, float gamma) {
-        auto *cuboid = new Object(CUBOID, color, {center.x, center.y, center.z, length, width, height, alpha, beta, gamma});
+                                    float height, float alpha, float beta, float gamma, float texture, float para) {
+        auto *cuboid = new Object(CUBOID, color, {center.x, center.y, center.z, length, width, height, alpha, beta, gamma, texture, para});
         object_list.push_back(cuboid);
         return cuboid;
     }
 
     Object *CSG_tree::create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2,
-                                         glm::vec3 vertex3, glm::vec3 vertex4) {
+                                         glm::vec3 vertex3, glm::vec3 vertex4, float texture, float para) {
         auto *tetrahedron = new Object(TETRAHEDRON, color, {vertex1.x, vertex1.y, vertex1.z,
                                                             vertex2.x, vertex2.y, vertex2.z,
                                                             vertex3.x, vertex3.y, vertex3.z,
-                                                            vertex4.x, vertex4.y, vertex4.z});
+                                                            vertex4.x, vertex4.y, vertex4.z, texture, para});
         object_list.push_back(tetrahedron);
         return tetrahedron;
     }
@@ -178,14 +180,15 @@ namespace Objects {
 
     Object *CSG_tree::create_plane(Color color,
                                    glm::vec3 normal,
-                                   float h) {
-        auto *plane = new Object(PLANE, color, {normal.x, normal.y, normal.z, -h});
+                                   float h, float texture, float para) {
+        auto *plane = new Object(PLANE, color, {normal.x, normal.y, normal.z, -h, texture, para});
         object_list.push_back(plane);
         return plane;
     }
 
-    Object *CSG_tree::create_menger_sponge(Color color, glm::vec3 center, float size, int iterations) {
-        auto *menger = new Object(MENGER_SPONGE, color, {center.x, center.y, center.z, size, static_cast<float>(iterations)});
+    Object *CSG_tree::create_menger_sponge(Color color, glm::vec3 center, float size, int iterations, 
+                                            float texture, float para) {
+        auto *menger = new Object(MENGER_SPONGE, color, {center.x, center.y, center.z, size, static_cast<float>(iterations), texture, para});
         object_list.push_back(menger);
         return menger;
     }

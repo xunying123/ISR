@@ -28,7 +28,7 @@ namespace Objects {
 
         Object_type type;
         Color color{};
-        float pos_args[12]{};
+        float pos_args[28]{};
         Object *left = nullptr;
         Object *right = nullptr;
         Object *parent = nullptr;
@@ -67,22 +67,25 @@ namespace Objects {
 
         std::vector<std::vector<float>> generate_texture_data();
 
-        Object *create_sphere(Color color, glm::vec3 center, float radius);
+        Object *create_sphere(Color color, glm::vec3 center, float radius, float texture = 0, float para = 0.0f);
 
-        Object *create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius);
+        Object *create_cone(Color color, glm::vec3 center, glm::vec3 vertex, float radius, 
+                            float texture = 0, float para = 0.0f);
 
-        Object *create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius);
+        Object *create_cylinder(Color color, glm::vec3 center1, glm::vec3 center2, float radius, 
+                                float texture = 0, float para = 0.0f);
 
         Object *create_cuboid(Color color, glm::vec3 center, float length, float width,
-                              float height, float alpha, float beta, float gamma);
+                              float height, float alpha, float beta, float gamma, float texture = 0, float para = 0.0f);
 
         Object *create_tetrahedron(Color color, glm::vec3 vertex1, glm::vec3 vertex2,
-                                   glm::vec3 vertex3, glm::vec3 vertex4);
+                                   glm::vec3 vertex3, glm::vec3 vertex4, float texture = 0, float para = 0.0f);
 
         Object *create_plane(Color color,
-                             glm::vec3 normal, float h);
+                             glm::vec3 normal, float h, float texture = 0, float para = 0.0f);
 
-        Object *create_menger_sponge(Color color, glm::vec3 center, float size, int iterations);
+        Object *create_menger_sponge(Color color, glm::vec3 center, float size, int iterations, 
+                                     float texture = 0, float para = 0.0f);
 
         Object *create_intersection(Object *left, Object *right);
 

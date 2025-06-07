@@ -168,7 +168,7 @@ float sdMengerSponge(vec3 p, float size, int iterations)
     return d * size;
 }
 
-void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
+void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top, inout int matIDStack[8], inout float matParStack[8])
 {
     const int STRIDE = 8;               // 8 × vec4
     int base = idx * STRIDE;
@@ -186,8 +186,12 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
     {
         vec3 center = t1.yzw;           // (pos0~2)
         float radius = t2.x;            // (pos3)
+        float texture = t2.y;
+        float para = t2.z;
 
         stack[stack_top] = vec4(curColor, sdSphere(p - center, radius));
+        matIDStack[stack_top]  = int(texture + 0.5);
+        matParStack[stack_top] = para;
         stack_top += 1;
     }
     else if (type == 1)               /* ------------ CONE -------------*/
@@ -195,6 +199,8 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec3 center = t1.yzw;           // (pos0~2)
         vec3 vertex = t2.xyz;           // (pos3~5)
         float radius = t2.w;            // (pos6)
+        float texture = t3.x;
+        float para = t3.y;
 
         vec3 axis = normalize(center - vertex);
         float height = length(center - vertex);
@@ -211,6 +217,8 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec2  c     = vec2(sin(angle), cos(angle));
 
         stack[stack_top] = vec4(curColor, sdCone(p_local, c, height));
+        matIDStack[stack_top]  = int(texture + 0.5);
+        matParStack[stack_top] = para;
         stack_top += 1;
     }
     else if (type == 2)               /* ---------- CYLINDER ---------- */
@@ -218,8 +226,12 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec3 a       = t1.yzw;
         vec3 b       = t2.xyz;
         float radius = t2.w;
+        float texture = t3.x;
+        float para = t3.y;
 
         stack[stack_top] = vec4(curColor, sdCylinderFlat(p, a, b, radius));
+        matIDStack[stack_top]  = int(texture + 0.5);
+        matParStack[stack_top] = para;
         stack_top += 1;
     }
     else if (type == 3)                 /* ---------- CUBOID ---------- */
@@ -229,8 +241,12 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         float beta  = t3.x;                        // (pos7)
         float gamma = t3.y;                        // (pos8)
         vec3 halfExt  = vec3(t2.x, t2.y, t2.z) * 0.5;  // (pos3~5)
+        float texture = t3.z;
+        float para = t3.w;
 
         stack[stack_top] = vec4(curColor, sdBox(p - center, alpha, beta, gamma, halfExt));
+        matIDStack[stack_top]  = int(texture + 0.5);
+        matParStack[stack_top] = para;
         stack_top += 1;
     }
     else if (type == 4)                 /* ---------- Tetrahedron ---------- */
@@ -239,8 +255,12 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec3 v1 = t2.xyz;                     // (pos3~5)
         vec3 v2 = vec3(t2.w, t3.x, t3.y); // (pos6~8)
         vec3 v3 = vec3(t3.z, t3.w, t4.x); // (pos9~11)
+        float texture = t4.y;
+        float para = t4.z;
 
         stack[stack_top] = vec4(curColor, sdTetrahedron(p, v0, v1, v2, v3));
+        matIDStack[stack_top]  = int(texture + 0.5);
+        matParStack[stack_top] = para;
         stack_top += 1;
     }
     else if (type == 5)                 /* ---------- Intersect ---------- */
@@ -249,9 +269,15 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         float sdf2 = stack[stack_top - 1].w;
         vec3 color1 = stack[stack_top - 2].xyz;
         vec3 color2 = stack[stack_top - 1].xyz;
+        int   id1  = matIDStack[stack_top-2];
+        int   id2  = matIDStack[stack_top-1];
+        float pr1  = matParStack[stack_top-2];
+        float pr2  = matParStack[stack_top-1];
         stack_top -= 1;
         float condition = step(sdf1, sdf2);
         stack[stack_top - 1] = mix(vec4(color1, sdf1), vec4(color2, sdf2), condition);
+        matIDStack[stack_top-1]  = int( mix(float(id1), float(id2), condition) + 0.5 );
+        matParStack[stack_top-1] = mix(pr1, pr2, condition);
     }
     else if (type == 6)                 /* ---------- Union ---------- */
     {
@@ -259,9 +285,15 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         float sdf2 = stack[stack_top - 1].w;
         vec3 color1 = stack[stack_top - 2].xyz;
         vec3 color2 = stack[stack_top - 1].xyz;
+        int   id1  = matIDStack[stack_top-2];
+        int   id2  = matIDStack[stack_top-1];
+        float pr1  = matParStack[stack_top-2];
+        float pr2  = matParStack[stack_top-1];
         stack_top -= 1;
         float condition = step(sdf1, sdf2);
         stack[stack_top - 1] = mix(vec4(color2, sdf2), vec4(color1, sdf1), condition);
+        matIDStack[stack_top-1]  = int( mix(float(id2), float(id1), condition) + 0.5 );
+        matParStack[stack_top-1] = mix(pr2, pr1, condition);
     }
     else if (type == 7)                 /* ---------- Subtract ---------- */
     {
@@ -269,15 +301,26 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         float sdf2 = stack[stack_top - 1].w;
         vec3 color1 = stack[stack_top - 2].xyz;
         vec3 color2 = stack[stack_top - 1].xyz;
+        int   id1  = matIDStack[stack_top-2];
+        int   id2  = matIDStack[stack_top-1];
+        float pr1  = matParStack[stack_top-2];
+        float pr2  = matParStack[stack_top-1];
         stack_top -= 1;
         float condition = step(sdf1, -sdf2);
         stack[stack_top - 1] = mix(vec4(color1, sdf1), vec4(color2, -sdf2), condition);
+
+        matIDStack[stack_top-1]  = int( mix(float(id1), float(id2), condition) + 0.5 );
+        matParStack[stack_top-1] = mix(pr1, pr2, condition);
     }
     else if (type == 8)                 /* ---------- PLANE ---------- */
     {
         vec3 n = t1.yzw;
         float h = t2.x;
+        float texture = t2.y;
+        float para = t2.z;
         stack[stack_top] = vec4(curColor, sdPlane(p, n, h));
+        matIDStack[stack_top] = int(texture + 0.5);
+        matParStack[stack_top]= para;
         stack_top += 1;
     }
     else if (type == 9)                 /* ---------- MENGER_SPONGE ---------- */
@@ -285,21 +328,29 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top)
         vec3 center = t1.yzw;           // (pos0~2)
         float size = t2.x;              // (pos3)
         int iterations = int(t2.y + 0.5); // (pos4)
+        float texture = t2.z;
+        float para = t2.w;
         
         stack[stack_top] = vec4(curColor, sdMengerSponge(p - center, size, iterations));
+        matIDStack[stack_top] = int(texture + 0.5);
+        matParStack[stack_top]= para;
         stack_top += 1;
     }
 }
 
-float map(vec3 p, out vec3 col)
+float map(vec3 p, out vec3 col, out int matID, out float matPar)
 {
     vec4 stack[8] = vec4[8](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+    int   idStack [8] = int[8](0, 0, 0, 0, 0, 0, 0, 0);
+    float parStack[8] = float[8](0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     int stack_top = 0;
     for (int i = 0; i < numObjects; ++i)
     {
-        distOne(i, p, stack, stack_top);
+        distOne(i, p, stack, stack_top, idStack, parStack);
     }
     col = stack[0].xyz;
+    matID  = idStack[0];
+    matPar = parStack[0];
     return stack[0].w;
 }
 
@@ -308,12 +359,14 @@ vec3 calcNormal(vec3 p)
     // 使用更高精度的法向量计算
     const float h = 1e-4;  // 减小步长以提高精度
     vec3 dummy;
+    int idDummy;
+    float parDummy;
     
     // 使用更精确的中心差分法
     vec3 n = vec3(
-        map(p + vec3(h, 0.0, 0.0), dummy) - map(p - vec3(h, 0.0, 0.0), dummy),
-        map(p + vec3(0.0, h, 0.0), dummy) - map(p - vec3(0.0, h, 0.0), dummy),
-        map(p + vec3(0.0, 0.0, h), dummy) - map(p - vec3(0.0, 0.0, h), dummy)
+        map(p + vec3(h, 0.0, 0.0), dummy, idDummy, parDummy) - map(p - vec3(h, 0.0, 0.0), dummy, idDummy, parDummy),
+        map(p + vec3(0.0, h, 0.0), dummy, idDummy, parDummy) - map(p - vec3(0.0, h, 0.0), dummy, idDummy, parDummy),
+        map(p + vec3(0.0, 0.0, h), dummy, idDummy, parDummy) - map(p - vec3(0.0, 0.0, h), dummy, idDummy, parDummy)
     );
     return normalize(n);
 }
@@ -327,7 +380,9 @@ float softShadow(vec3 ro, vec3 rd, float mint, float maxt)
     {
         vec3  pos = ro + rd * t;
         vec3  dump;
-        float h   = map(pos, dump);          // 场景 SDF
+        int   idDummy;
+        float parDummy;
+        float h   = map(pos, dump, idDummy, parDummy);          // 场景 SDF
         if(h < 5e-5) return 0.0;             // 命中遮挡
         res = min(res, 8.0 * h / t);         // penumbra
         t  += clamp(h, 0.02, 0.25);          // 步长
@@ -345,7 +400,9 @@ float calcAO(vec3 p, vec3 n)
     {
         float dist = 0.02 * float(i);     // 采样半径 (线性增长)
         vec3  colDummy;
-        float d = map(p + n * dist, colDummy);   // 距离场
+        int   idDummy;
+        float parDummy;
+        float d = map(p + n * dist, colDummy, idDummy, parDummy);   // 距离场
 
         occ += (dist - d) * w;             // d 越小 → 遮挡越重
         w   *= 0.6;                        // 权重递减
@@ -353,7 +410,7 @@ float calcAO(vec3 p, vec3 n)
     return clamp(1.0 - occ, 0.0, 1.0);     // 1→完全暴露, 0→全遮
 }
 
-float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
+float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col, out int matID, out float matPar)
 {
     const float EPS  = 8e-5;   // 更高的精度阈值
     const float TMAX = 100.0;
@@ -362,7 +419,7 @@ float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
     for (int i = 0; i < 768; ++i)  // 增加最大迭代次数
     {
         pos = ro + rd * t;
-        float d = map(pos, col);
+        float d = map(pos, col, matID, matPar);
         
         if (d < EPS) return t;
         
@@ -372,6 +429,52 @@ float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col)
         if (t > TMAX) break;
     }
     return -1.0;
+}
+
+/* ------------------------------------------------------------
+ * diffuseShading
+ *   pos      ─ 命中的世界坐标
+ *   n        ─ 法向量（已归一化）
+ *   viewDir  ─ 从表面指向相机的向量 (已归一化)
+ *   albedo   ─ 物体基色 (可以是贴图 × 颜色，也可以纯 solid color)
+ *
+ * 返回值     ─ 线性色空间 (RGB 0–1)
+ * ----------------------------------------------------------*/
+vec3 diffuseShading(vec3 pos, vec3 n, vec3 viewDir, vec3 albedo)
+{
+    /* === 半球环境光 (Hemisphere Ambient) === */
+    vec3 skyCol    = vec3(0.24, 0.32, 0.45);   // 天空色
+    vec3 groundCol = vec3(0.18, 0.15, 0.13);   // 地面色
+    vec3 hemi      = mix(groundCol, skyCol, n.y * 0.5 + 0.5);
+
+    /* === 两盏方向光 === */
+    vec3 kDir  = normalize(vec3( 0.5, 0.7, -0.4));  // 关键光 (Key)
+    vec3 fDir  = normalize(vec3(-0.4, 0.3,  0.5));  // 反向填充 (Fill/Rim)
+    vec3 lightCol = vec3(1.08, 0.97, 0.90);
+
+    /* 主光软阴影 */
+    float kShadow = softShadow(pos + n * 1e-3, kDir, 0.05, 20.0);
+
+    /* === 漫反射 (Lambert) === */
+    float kDiff = max(dot(n, kDir), 0.0) * kShadow;
+    float fDiff = max(dot(n, fDir), 0.0);            // 填充光不投影
+
+    /* === 高光 (Blinn–Phong) === */
+    vec3  halfK = normalize(kDir + viewDir);
+    vec3  halfF = normalize(fDir + viewDir);
+    float kSpec = pow(max(dot(n, halfK), 0.0), 64.0) * kShadow;
+    float fSpec = pow(max(dot(n, halfF), 0.0), 64.0);
+
+    /* === 环境光遮蔽 (Ambient Occlusion) === */
+    float ao = calcAO(pos, n);
+
+    /* === 颜色合成 === */
+    vec3 color =
+          albedo * (hemi * 0.6 * ao                     // 环境光
+                  + lightCol * (0.9 * kDiff + 0.4 * fDiff))   // 漫反射
+        + lightCol * 0.4 * (kSpec + fSpec);                    // 高光
+
+    return color;   // 线性色彩，留给 Tone Mapping 处理
 }
 
 void main()
@@ -405,7 +508,10 @@ void main()
 
         /* 2) Ray March */
         vec3 hitPos, baseCol;
-        float t = march(ro, rd, hitPos, baseCol);
+        int   hitMat;
+        float hitPar;
+
+        float t = march(ro, rd, hitPos, baseCol, hitMat, hitPar);
         vec3 sampleColor = vec3(0.0);
         
         if (t < 0.0)                        // background
@@ -425,49 +531,59 @@ void main()
             vec3 n       = calcNormal(hitPos);
             vec3 viewDir = normalize(-rd);            // 从表面看向相机
 
-            /* === 环境光遮蔽 (AO) === */
-            float ao = calcAO(hitPos, n);
+            /* 0 === 漫反射 ------------------------------------------------ */
+            if (hitMat == 0)
+            {
+                sampleColor = diffuseShading(hitPos, n, viewDir, baseCol);
+            }
 
-            /* === 半球环境光 (天空+地面) === */
-            vec3 skyCol    = vec3(0.24, 0.32, 0.45);
-            vec3 groundCol = vec3(0.18, 0.15, 0.13);
-            vec3 hemi      = mix(groundCol, skyCol, n.y * 0.5 + 0.5);
+            /* 1 === 理想镜面 ---------------------------------------------- */
+            else if (hitMat == 1)
+            {
+                vec3 reflDir = reflect(rd, n);
+                vec3  colD; int idD; float parD;
+                float t2 = march(hitPos + n*1e-3, reflDir,
+                                 hitPos, colD, idD, parD);
 
-            /* === 两盏方向光 === */
-            const vec3 kDir = normalize(vec3( 0.5, 0.7, -0.4));    // 主光
-            const vec3 fDir = normalize(vec3(-0.4, 0.3,  0.5));    // 反光
-            vec3  lightCol  = vec3(1.08, 0.97, 0.90);
+                sampleColor = (t2 < 0.0)
+                          ? textureLod(uEnvMap, reflDir, 0.0).rgb
+                          : colD;                         // 二次射线命中 → 用命中色
+            }
 
-            /* 主光软阴影 */
-            float kShadow = softShadow(hitPos + n*1e-3, kDir, 0.05, 20.0);
+            /* 2 === 玻璃 / 折射 ------------------------------------------- */
+            else if (hitMat == 2)
+            {
+                float n1 = 1.0, n2 = hitPar;             // hitPar 存折射率
+                bool  into = dot(rd, n) < 0.0;
+                float eta  = into ? n1/n2 : n2/n1;
 
-            /* 漫反射 */
-            float kDiff = max(dot(n, kDir), 0.0) * kShadow;
-            float fDiff = max(dot(n, fDir), 0.0);                  // 反光不投影
+                /* Schlick 近似 Fresnel */
+                float cosI = clamp(dot(viewDir, n), 0.0, 1.0);
+                float F0 = pow((n1 - n2) / (n1 + n2), 2.0);
+                float Fr = F0 + (1.0 - F0) * pow(1.0 - cosI, 5.0);
 
-            /* 高光（Blinn-Phong） */
-            vec3  halfK = normalize(kDir + viewDir);
-            vec3  halfF = normalize(fDir + viewDir);
-            float kSpec = pow(max(dot(n, halfK), 0.0), 64.0) * kShadow;
-            float fSpec = pow(max(dot(n, halfF), 0.0), 64.0);
+                vec3 reflDir = reflect(rd, n);
+                vec3 refrDir = refract(rd, into ? n : -n, eta);
 
-            /* ========== 基色累加 ========== */
-            vec3 color =
-                baseCol * (hemi * 0.6 * ao + lightCol * (0.9*kDiff + 0.4*fDiff)) + lightCol * 0.4 * (kSpec + fSpec);
+                vec3 reflCol = textureLod(uEnvMap, reflDir, 0.0).rgb;
+                vec3 refrCol = textureLod(uEnvMap, refrDir, 0.0).rgb;
 
-            /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
-            float exposure = 0.9;                                   // 可调曝光
-            color *= exposure;
-
-            color = (color * (2.51*color + 0.03)) / (color * (2.43*color + 0.59) + 0.14);
-
-            /* ====== 提升饱和度 ====== */
-            float sat = 1.5;                               // 降低饱和度以获得更自然的效果
-            float Y   = dot(color, vec3(0.2126,0.7152,0.0722)); // 线性亮度
-            color = mix(vec3(Y), color, sat);               // sat↑→更鲜艳
-
-            sampleColor = pow(color, vec3(1.0/2.2));                      // sRGB Gamma
+                sampleColor = mix(refrCol, reflCol, Fr);
+            }
         }
+
+        /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
+        float exposure = 0.9;                                   // 可调曝光
+        sampleColor *= exposure;
+
+        sampleColor = (sampleColor * (2.51*sampleColor + 0.03)) / (sampleColor * (2.43*sampleColor + 0.59) + 0.14);
+
+        /* ====== 提升饱和度 ====== */
+        float sat = 1.5;                               // 降低饱和度以获得更自然的效果
+        float Y   = dot(sampleColor, vec3(0.2126,0.7152,0.0722)); // 线性亮度
+        sampleColor = mix(vec3(Y), sampleColor, sat);               // sat↑→更鲜艳
+
+        sampleColor = pow(sampleColor, vec3(1.0/2.2));  
         
         finalColor += sampleColor;
     }

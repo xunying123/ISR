@@ -218,7 +218,7 @@ int main() {
     /* ① 告诉着色器：uEnvMap 来自 texture unit 1 */
     glUniform1i(glGetUniformLocation(prog, "uEnvMap"), 1);
 
-    glUniform1i(glGetUniformLocation(prog,"uEnvEnable"), 0);   // 1 = ON
+    glUniform1i(glGetUniformLocation(prog,"uEnvEnable"), 1);   // 1 = ON
 
     /* ② 依旧把 objectBuffer 绑定到槽 0（已有） */
     glUniform1i(glGetUniformLocation(prog, "objectBuffer"), 0);
@@ -230,34 +230,55 @@ int main() {
                                  {0.0f,1.0f,0.0f},     // 法向量朝 +Y
                                  -1.0f);                // y = -1 → dot(p,n)+h=0
 
-    auto* menger0 = tree.create_menger_sponge({1.0f, 0.2f, 0.2f, 1.0f},   // 红色
-                                           glm::vec3(-6.0f, 1.0f, 0.0f),   
-                                           1.5f,                          
-                                           1);                            
+    // auto* menger0 = tree.create_menger_sponge({1.0f, 0.2f, 0.2f, 1.0f},   // 红色
+    //                                        glm::vec3(-6.0f, 1.0f, 0.0f),   
+    //                                        1.5f,                          
+    //                                        1);                            
 
-    // 迭代1次
-    auto* menger1 = tree.create_menger_sponge({0.8f, 0.4f, 0.2f, 1.0f},   // 橙色
-                                           glm::vec3(-2.0f, 1.0f, 0.0f),   
-                                           1.5f,                          
-                                           2);                            
+    // // 迭代1次
+    // auto* menger1 = tree.create_menger_sponge({0.8f, 0.4f, 0.2f, 1.0f},   // 橙色
+    //                                        glm::vec3(-2.0f, 1.0f, 0.0f),   
+    //                                        1.5f,                          
+    //                                        2);                            
 
-    // 迭代2次
-    auto* menger2 = tree.create_menger_sponge({0.6f, 0.6f, 0.2f, 1.0f},   // 黄色
-                                           glm::vec3(2.0f, 1.0f, 0.0f),    
-                                           1.5f,                          
-                                           3);                            
+    // // 迭代2次
+    // auto* menger2 = tree.create_menger_sponge({0.6f, 0.6f, 0.2f, 1.0f},   // 黄色
+    //                                        glm::vec3(2.0f, 1.0f, 0.0f),    
+    //                                        1.5f,                          
+    //                                        3);                            
 
-    // 迭代3次
-    auto* menger3 = tree.create_menger_sponge({0.2f, 0.8f, 0.4f, 1.0f},   // 绿色
-                                           glm::vec3(6.0f, 1.0f, 0.0f),    
-                                           1.5f,                          
-                                           4);
+    // // 迭代3次
+    // auto* menger3 = tree.create_menger_sponge({0.2f, 0.8f, 0.4f, 1.0f},   // 绿色
+    //                                        glm::vec3(6.0f, 1.0f, 0.0f),    
+    //                                        1.5f,                          
+    //                                        4);
 
-    // 在背景添加一个大的Menger sponge
-    auto* menger_bg = tree.create_menger_sponge({0.3f, 0.3f, 0.8f, 0.8f}, // 半透明蓝色
-                                             glm::vec3(0.0f, 4.0f, 8.0f),    
-                                             4.0f,                          
-                                             3);
+    // // 在背景添加一个大的Menger sponge
+    // auto* menger_bg = tree.create_menger_sponge({0.3f, 0.3f, 0.8f, 0.8f}, // 半透明蓝色
+    //                                          glm::vec3(0.0f, 4.0f, 8.0f),    
+    //                                          4.0f,                          
+    //                                          3);
+
+    auto* box = tree.create_cuboid({1,0,0,1},
+                               {0,1,0}, 2,2,2,
+                               1,1,1,0,0); 
+
+    auto* sph = tree.create_sphere({1.0f,0.3f,0.3f,1.0f},
+                              {-1.0f,0.0f,0.0f}, 1.0f, 2, 0.5f);
+    sph->translate({0.0f,-0.5f,0.0f});
+    auto* new_bee = tree.create_union(box, sph); // 取并集
+
+    auto* cone = tree.create_cone({1.0f,0.6f,0.2f,1.0f},
+                   {-3.0f,-1.0f,0.0f},         // baseCenter
+                   {-3.0f,2.0f,0.0f},         // apex
+                   1.0f, 0, 1);                    // 半径
+
+    auto* cyl = tree.create_cylinder({0.2f,0.6f,1.0f,1.0f},
+                                { 2.0f,0.0f, 1.0f},    // 端点 A (支点)
+                                { 2.0f,1.5f, -0.5f},    // 端点 B
+                                0.4f, 0);                 // 半径
+   cyl->scale(1.5f);
+   cyl->translate({0.0f,-1.0f,0.0f});      // 向上抬 0.5
 
 
     /* ---------- 5. 打包成连续 float ---------- */
