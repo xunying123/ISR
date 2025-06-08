@@ -481,6 +481,7 @@ void main()
 {
     // 抗锯齿开关：设为1启用2x2超采样，设为0禁用以提高性能
     const bool ENABLE_AA = true;
+    const int MAX_BOUNCES = 4; // 最大反射次数
     
     vec3 finalColor = vec3(0.0);
     int samples = ENABLE_AA ? 4 : 1;
@@ -497,95 +498,116 @@ void main()
             sampleCoord = fragCoord + offset / iResolution.xy;
         }
         
-        /* 1) Ray */
+        /* 1) 初始化光线 */
         vec2 uv = (sampleCoord * 2.0 - 1.0);
         uv.x *= iResolution.x / iResolution.y;
 
         vec3 ro = vec3(0.0, 2.0, -5.0);     // camera pos
         vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
-        float pitch = radians(-20.0);            // 俯视 10°
+        float pitch = radians(-20.0);        // 俯视 20°
         rd.yz = mat2(cos(pitch), -sin(pitch), sin(pitch),  cos(pitch)) * rd.yz;
 
-        /* 2) Ray March */
-        vec3 hitPos, baseCol;
-        int   hitMat;
-        float hitPar;
-
-        float t = march(ro, rd, hitPos, baseCol, hitMat, hitPar);
-        vec3 sampleColor = vec3(0.0);
+        /* 2) 光线追踪循环 */
+        vec3 accumColor = vec3(0.0);  // 累积颜色
+        vec3 throughput = vec3(1.0);  // 光线能量衰减系数
+        int bounceCount = 0;           // 当前反射次数
         
-        if (t < 0.0)                        // background
+        // 光线追踪主循环
+        for(int bounce = 0; bounce < MAX_BOUNCES; bounce++)
         {
-            vec3 env = (uEnvEnable == 1) ? textureLod(uEnvMap, rd, 0.0).rgb : vec3(0.0);
-
-            /* 曝光 + Tone-map + γ，与场景同流程 */
-            float exposure = 0.9;
-            env *= exposure;
-            env  = (env * (2.51*env + 0.03)) / (env * (2.43*env + 0.59) + 0.14);
-
-            sampleColor = pow(env, vec3(1.0/2.2));
-        }
-        else
-        {
-            /* ---------- 3) Light ------------------------------------------------ */
-            vec3 n       = calcNormal(hitPos);
-            vec3 viewDir = normalize(-rd);            // 从表面看向相机
-
-            /* 0 === 漫反射 ------------------------------------------------ */
-            if (hitMat == 0)
+            bounceCount++;
+            
+            /* 光线步进 */
+            vec3 hitPos, baseCol;
+            int   hitMat;
+            float hitPar;
+            
+            float t = march(ro, rd, hitPos, baseCol, hitMat, hitPar);
+            
+            /* 未命中 - 使用环境贴图 */
+            if(t < 0.0)
             {
-                sampleColor = diffuseShading(hitPos, n, viewDir, baseCol);
+                vec3 env = (uEnvEnable == 1) ? textureLod(uEnvMap, rd, 0.0).rgb : vec3(0.0);
+                accumColor += throughput * env;
+                break;
             }
-
-            /* 1 === 理想镜面 ---------------------------------------------- */
-            else if (hitMat == 1)
+            
+            /* 命中表面 - 计算法线 */
+            vec3 n = calcNormal(hitPos);
+            vec3 viewDir = normalize(-rd);  // 从表面看向相机
+            
+            /* 3) 材质处理 */
+            if(hitMat == 0) // 漫反射材质
             {
-                vec3 reflDir = reflect(rd, n);
-                vec3  colD; int idD; float parD;
-                float t2 = march(hitPos + n*1e-3, reflDir,
-                                 hitPos, colD, idD, parD);
-
-                sampleColor = (t2 < 0.0)
-                          ? textureLod(uEnvMap, reflDir, 0.0).rgb
-                          : colD;                         // 二次射线命中 → 用命中色
+                vec3 color = diffuseShading(hitPos, n, viewDir, baseCol);
+                accumColor += throughput * color;
+                break; // 漫反射不继续反射
             }
-
-            /* 2 === 玻璃 / 折射 ------------------------------------------- */
-            else if (hitMat == 2)
+            else if(hitMat == 1) // 镜面反射
             {
-                float n1 = 1.0, n2 = hitPar;             // hitPar 存折射率
+                // 计算反射方向
+                rd = reflect(rd, n);
+                
+                // 更新光线起点（防止自交）
+                ro = hitPos + n * 1e-3;
+                
+                // 更新能量衰减（反射损失）
+                throughput *= baseCol * 0.8;
+            }
+            else if(hitMat == 2) // 折射材质
+            {
+                vec3 n = calcNormal(hitPos);
                 bool  into = dot(rd, n) < 0.0;
-                float eta  = into ? n1/n2 : n2/n1;
+                float n1 = 1.0, n2 = hitPar;
+                float eta = into ? n1/n2 : n2/n1;
 
-                /* Schlick 近似 Fresnel */
-                float cosI = clamp(dot(viewDir, n), 0.0, 1.0);
-                float F0 = pow((n1 - n2) / (n1 + n2), 2.0);
-                float Fr = F0 + (1.0 - F0) * pow(1.0 - cosI, 5.0);
+                float cosI = clamp(dot(-rd, n), 0.0, 1.0);
+                float F0   = pow((n1 - n2)/(n1 + n2), 2.0);
+                float Fr   = F0 + (1.0 - F0)*pow(1.0 - cosI, 5.0);
 
                 vec3 reflDir = reflect(rd, n);
                 vec3 refrDir = refract(rd, into ? n : -n, eta);
 
-                vec3 reflCol = textureLod(uEnvMap, reflDir, 0.0).rgb;
+                /* 反射颜色 */
+                vec3 cRefl; int idD; float pD;
+                float tRefl = march(hitPos + n*1e-3, reflDir,
+                                    hitPos, cRefl, idD, pD);
+                vec3 reflCol = (tRefl < 0.0)
+                            ? textureLod(uEnvMap, reflDir, 0.0).rgb
+                            : cRefl;
+
+                /* 折射颜色（这里只直接天空盒，也可再 march 一次） */
                 vec3 refrCol = textureLod(uEnvMap, refrDir, 0.0).rgb;
 
-                sampleColor = mix(refrCol, reflCol, Fr);
+                /* Fresnel 线性混合并累加 */
+                accumColor += throughput * mix(refrCol, reflCol, Fr);
+
+                /* 终止这条路径 */
+                break;
             }
+            
+            /* 4) 能量衰减检查 - 提前终止 */
+            float maxComponent = max(max(throughput.r, throughput.g), throughput.b);
+            if(maxComponent < 0.01) break;
         }
-
-        /* ---------- HDR ToneMap (ACES) + Gamma ---------- */
-        float exposure = 0.9;                                   // 可调曝光
-        sampleColor *= exposure;
-
-        sampleColor = (sampleColor * (2.51*sampleColor + 0.03)) / (sampleColor * (2.43*sampleColor + 0.59) + 0.14);
-
-        /* ====== 提升饱和度 ====== */
-        float sat = 1.5;                               // 降低饱和度以获得更自然的效果
-        float Y   = dot(sampleColor, vec3(0.2126,0.7152,0.0722)); // 线性亮度
-        sampleColor = mix(vec3(Y), sampleColor, sat);               // sat↑→更鲜艳
-
-        sampleColor = pow(sampleColor, vec3(1.0/2.2));  
         
-        finalColor += sampleColor;
+        /* 5) 色调映射和伽马校正 */
+        float exposure = 0.9;
+        vec3 mappedColor = accumColor * exposure;
+        
+        // ACES 色调映射
+        mappedColor = (mappedColor * (2.51 * mappedColor + 0.03)) / 
+                     (mappedColor * (2.43 * mappedColor + 0.59) + 0.14);
+        
+        // 提升饱和度
+        float sat = 1.5;
+        float Y = dot(mappedColor, vec3(0.2126, 0.7152, 0.0722));
+        mappedColor = mix(vec3(Y), mappedColor, sat);
+        
+        // 伽马校正
+        mappedColor = pow(mappedColor, vec3(1.0/2.2));
+        
+        finalColor += mappedColor;
     }
     
     FragColor = vec4(finalColor / float(samples), 1.0);
