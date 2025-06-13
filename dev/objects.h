@@ -17,6 +17,8 @@ namespace Objects {
         DIFFERENCE,
         PLANE,
         MENGER_SPONGE,
+        MANDELBULB,
+        JULIA_SET_3D,
     };
 
     struct Color {
@@ -86,6 +88,14 @@ namespace Objects {
 
         Object *create_menger_sponge(Color color, glm::vec3 center, float size, int iterations, 
                                      float texture = 0, float para = 0.0f);
+
+        Object *create_mandelbulb(Color color, glm::vec3 center, float scale, 
+                                  float power = 8.0f, int max_iterations = 64, 
+                                  float texture = 0, float para = 0.0f);
+
+        Object *create_julia_set_3d(Color color, glm::vec3 center, float scale, 
+                                    glm::vec2 c_param, int max_iterations = 64, 
+                                    float texture = 0, float para = 0.0f);
 
         Object *create_intersection(Object *left, Object *right);
 

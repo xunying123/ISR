@@ -168,6 +168,87 @@ float sdMengerSponge(vec3 p, float size, int iterations)
     return d * size;
 }
 
+// Mandelbulb 3D SDF函数
+// 基于Inigo Quilez的实现: https://iquilezles.org/articles/mandelbulb/
+float sdMandelbulb(vec3 p, vec3 center, float scale, float power, int maxIter)
+{
+    vec3 w = (p - center) / scale;
+    float m = dot(w, w);
+    
+    vec4 trap = vec4(abs(w), m);
+    float dz = 1.0;
+    
+    for(int i = 0; i < maxIter; i++)
+    {
+        // |z|^2 > 4 则逃逸  
+        if(m > 4.0) break;
+        
+        // dz = power*|z|^(power-1)*dz + 1
+        dz = power * pow(sqrt(m), power - 1.0) * dz + 1.0;
+        
+        // z = z^power + c (这里c就是原始位置)
+        float r = length(w);
+        float b = power * acos(w.y / r);
+        float a = power * atan(w.x, w.z);
+        w = pow(r, power) * vec3(
+            sin(b) * sin(a),
+            cos(b),
+            sin(b) * cos(a)
+        ) + (p - center) / scale;
+        
+        trap = min(trap, vec4(abs(w), m));
+        m = dot(w, w);
+    }
+    
+    // 距离估计
+    return 0.25 * log(m) * sqrt(m) / dz * scale;
+}
+
+// Julia Set 3D SDF函数 - 基于Orbit Trapping技术
+// 参考: https://iquilezles.org/articles/juliasets3d/ 和 https://iquilezles.org/articles/orbittraps3d/
+float sdJuliaSet3D(vec3 p, vec3 center, float scale, vec2 c, int maxIter)
+{
+    vec3 z = (p - center) / scale;
+    float m2 = 0.0;
+    vec2 t = vec2(1e10);
+    
+    float dz = 1.0;  // 轨道导数
+    
+    for(int i = 0; i < maxIter; i++)
+    {
+        m2 = dot(z, z);
+        
+        // 逃逸条件
+        if(m2 > 4.0) break;
+        
+        // Orbit trapping - 测试与简单陷阱的距离
+        t.x = min(t.x, abs(z.y));                    // 到xz平面的距离
+        t.y = min(t.y, length(z.xz - vec2(1.0, 0.0))); // 到点(1,0)的距离
+        
+        // 计算轨道导数
+        dz = 2.0 * sqrt(m2) * dz + 1.0;
+        
+        // Julia集合迭代：z = z^2 + c
+        // 使用四元数形式的平方运算
+        float x = z.x, y = z.y, zz = z.z;
+        z = vec3(
+            x*x - y*y - zz*zz + c.x,
+            2.0*x*y + c.y,
+            2.0*x*zz
+        );
+    }
+    
+    // 距离估计，结合orbit trapping效果
+    float d = 0.5 * sqrt(m2) * log(m2) / dz;
+    
+    // 使用orbit trap来调制距离场
+    // 这可以创建更有趣的3D Julia集合结构
+    float trap = min(t.x, t.y);
+    d = max(d, trap * 0.1);  // 混合距离场和orbit traps
+    
+    return d * scale;
+}
+
 void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top, inout int matIDStack[8], inout float matParStack[8])
 {
     const int STRIDE = 8;               // 8 × vec4
@@ -336,6 +417,34 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top, inout in
         matParStack[stack_top]= para;
         stack_top += 1;
     }
+    else if (type == 10)                /* ---------- MANDELBULB ---------- */
+    {
+        vec3 center = t1.yzw;           // (pos0~2) center
+        float scale = t2.x;             // (pos3) scale
+        float power = t2.y;             // (pos4) Mandelbulb幂次参数
+        int maxIter = int(t2.z + 0.5);  // (pos5) 最大迭代次数
+        float texture = t2.w;           // (pos6) 材质类型
+        float para = t3.x;              // (pos7) 材质参数
+        
+        stack[stack_top] = vec4(curColor, sdMandelbulb(p, center, scale, power, maxIter));
+        matIDStack[stack_top] = int(texture + 0.5);
+        matParStack[stack_top] = para;
+        stack_top += 1;
+    }
+    else if (type == 11)                /* ---------- JULIA_SET_3D ---------- */
+    {
+        vec3 center = t1.yzw;           // (pos0~2) center
+        float scale = t2.x;             // (pos3) scale
+        vec2 c_param = vec2(t2.y, t2.z); // (pos4~5) Julia参数c = c.x + c.y*i
+        int maxIter = int(t2.w + 0.5);  // (pos6) 最大迭代次数
+        float texture = t3.x;           // (pos7) 材质类型
+        float para = t3.y;              // (pos8) 材质参数
+        
+        stack[stack_top] = vec4(curColor, sdJuliaSet3D(p, center, scale, c_param, maxIter));
+        matIDStack[stack_top] = int(texture + 0.5);
+        matParStack[stack_top] = para;
+        stack_top += 1;
+    }
 }
 
 float map(vec3 p, out vec3 col, out int matID, out float matPar)
@@ -502,9 +611,9 @@ void main()
         vec2 uv = (sampleCoord * 2.0 - 1.0);
         uv.x *= iResolution.x / iResolution.y;
 
-        vec3 ro = vec3(0.0, 2.0, -5.0);     // camera pos
+        vec3 ro = vec3(0.0, 4.0, -6.0);    // 相机位置：更远的距离以观察分布更开的三个分形
         vec3 rd = normalize(vec3(uv, 1.0)); // ray dir
-        float pitch = radians(-20.0);        // 俯视 20°
+        float pitch = radians(-15.0);        // 俯视角度减小到15°
         rd.yz = mat2(cos(pitch), -sin(pitch), sin(pitch),  cos(pitch)) * rd.yz;
 
         /* 2) 光线追踪循环 */

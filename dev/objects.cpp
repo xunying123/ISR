@@ -193,11 +193,43 @@ namespace Objects {
         return menger;
     }
 
+    Object *CSG_tree::create_mandelbulb(Color color, glm::vec3 center, float scale, 
+                                        float power, int max_iterations, 
+                                        float texture, float para) {
+        // 参数布局：center(3), scale(1), power(1), max_iterations(1), texture(1), para(1)
+        auto *mandelbulb = new Object(MANDELBULB, color, {
+            center.x, center.y, center.z,      // 0,1,2: center
+            scale,                              // 3: scale  
+            power,                              // 4: Mandelbulb幂次参数 (通常是8)
+            static_cast<float>(max_iterations), // 5: 最大迭代次数
+            texture, para                       // 6,7: 材质参数
+        });
+        object_list.push_back(mandelbulb);
+        return mandelbulb;
+    }
+
+    Object *CSG_tree::create_julia_set_3d(Color color, glm::vec3 center, float scale, 
+                                          glm::vec2 c_param, int max_iterations, 
+                                          float texture, float para) {
+        // 参数布局：center(3), scale(1), c_param(2), max_iterations(1), texture(1), para(1)
+        auto *julia = new Object(JULIA_SET_3D, color, {
+            center.x, center.y, center.z,      // 0,1,2: center
+            scale,                              // 3: scale  
+            c_param.x, c_param.y,              // 4,5: Julia参数c = c.x + c.y*i
+            static_cast<float>(max_iterations), // 6: 最大迭代次数
+            texture, para                       // 7,8: 材质参数
+        });
+        object_list.push_back(julia);
+        return julia;
+    }
+
     void Object::translate(const glm::vec3 &d) {
         switch (type) {
             case SPHERE:
             case CUBOID:
             case MENGER_SPONGE:
+            case MANDELBULB:
+            case JULIA_SET_3D:
                 pos_args[0] += d.x;
                 pos_args[1] += d.y;
                 pos_args[2] += d.z;
@@ -223,6 +255,12 @@ namespace Objects {
                 break;
             case MENGER_SPONGE:
                 pos_args[3] *= s;  // 缩放size参数
+                break;
+            case MANDELBULB:
+                pos_args[3] *= s;  // 缩放scale参数
+                break;
+            case JULIA_SET_3D:
+                pos_args[3] *= s;  // 缩放scale参数
                 break;
             case CUBOID:
                 pos_args[3] *= s;
@@ -304,6 +342,8 @@ namespace Objects {
         switch (type) {
             case SPHERE:
             case MENGER_SPONGE:
+            case MANDELBULB:
+            case JULIA_SET_3D:
                 apply(pos_args[0], pos_args[1], pos_args[2]);
                 break;
 

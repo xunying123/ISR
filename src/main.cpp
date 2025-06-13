@@ -226,60 +226,41 @@ int main() {
     /* ---------- 4. 在 CPU 端创建任意数量的物体 ---------- */
     using namespace Objects;
     CSG_tree tree = CSG_tree();
-    auto* ground = tree.create_plane({0.7f,0.7f,0.7f,1},   // 淡灰色
-                                 {0.0f,1.0f,0.0f},     // 法向量朝 +Y
-                                 -1.0f);                // y = -1 → dot(p,n)+h=0
-
-    auto* menger0 = tree.create_menger_sponge({1.0f, 0.2f, 0.2f, 1.0f},   // 红色
-                                           glm::vec3(-6.0f, 1.0f, 0.0f),   
-                                           1.5f,                          
-                                           1);                            
-
-    // 迭代1次
-    auto* menger1 = tree.create_menger_sponge({0.8f, 0.4f, 0.2f, 1.0f},   // 橙色
-                                           glm::vec3(-2.0f, 1.0f, 0.0f),   
-                                           1.5f,                          
-                                           2, 2, 0.1);                            
-
-    // 迭代2次
-    auto* menger2 = tree.create_menger_sponge({0.6f, 0.6f, 0.2f, 1.0f},   // 黄色
-                                           glm::vec3(2.0f, 1.0f, 0.0f),    
-                                           1.5f,                          
-                                           3, 1);                            
-
-    // 迭代3次
-    auto* menger3 = tree.create_menger_sponge({0.2f, 0.8f, 0.4f, 1.0f},   // 绿色
-                                           glm::vec3(6.0f, 1.0f, 0.0f),    
-                                           1.5f,                          
-                                           4);
-
-    // 在背景添加一个大的Menger sponge
-    auto* menger_bg = tree.create_menger_sponge({0.3f, 0.3f, 0.8f, 0.8f}, // 半透明蓝色
-                                             glm::vec3(0.0f, 4.0f, 8.0f),    
-                                             4.0f,                          
-                                             3);
-
-//     auto* box = tree.create_cuboid({1,0,0,1},
-//                                {0,1,0}, 2,2,2,
-//                                1,1,1,1,1); 
-
-//     auto* sph = tree.create_sphere({1.0f,0.3f,0.3f,1.0f},
-//                               {-1.0f,0.0f,0.0f}, 1.0f, 1, 1);
-//     sph->translate({0.0f,-0.5f,0.0f});
-//     auto* new_bee = tree.create_union(box, sph); // 取并集
-
-//     auto* cone = tree.create_cone({1.0f,0.6f,0.2f,1.0f},
-//                    {-3.0f,-1.0f,0.0f},         // baseCenter
-//                    {-3.0f,2.0f,0.0f},         // apex
-//                    1.0f, 0, 1);                    // 半径
-
-//     auto* cyl = tree.create_cylinder({0.2f,0.6f,1.0f,1.0f},
-//                                 { 2.0f,0.0f, 1.0f},    // 端点 A (支点)
-//                                 { 2.0f,1.5f, -0.5f},    // 端点 B
-//                                 0.4f, 0);                 // 半径
-//    cyl->scale(1.5f);
-//    cyl->translate({0.0f,-1.0f,0.0f});      // 向上抬 0.5
-
+    
+    // 创建地面
+    auto* ground = tree.create_plane({0.7f, 0.7f, 0.7f, 1.0f}, glm::vec3(0.0f, 1.0f, 0.0f), -1.0f);
+    
+    // 创建Menger Sponge分形 - 左侧，金色
+    auto* menger = tree.create_menger_sponge(
+        {1.0f, 0.8f, 0.3f, 1.0f},           // 颜色：金色
+        glm::vec3(-6.0f, 1.2f, 0.0f),       // 中心位置：左侧，更远
+        1.8f,                                // 大小
+        5,                                   // 迭代次数：4层精细度
+        0,                                   // 漫反射材质
+        0.0f                                 // 材质参数
+    );
+    
+    // 创建Mandelbulb分形 - 中间，紫红色
+    auto* mandelbulb = tree.create_mandelbulb(
+        {1.0f, 0.3f, 0.8f, 1.0f},           // 颜色：紫红色
+        glm::vec3(0.0f, 1.0f, 0.0f),        // 中心位置：中间
+        2.2f,                                // 缩放系数：更大一点
+        8.0f,                                // Mandelbulb幂次 (经典值)
+        80,                                  // 迭代次数：更高精度
+        0,                                   // 漫反射材质
+        0.0f                                 // 材质参数
+    );
+    
+    // 创建Julia Set 3D分形 - 右侧，青绿色，使用树枝状参数
+    auto* julia3d = tree.create_julia_set_3d(
+        {0.3f, 1.0f, 0.6f, 1.0f},           // 颜色：青绿色
+        glm::vec3(6.0f, 1.0f, 0.0f),        // 中心位置：右侧，更远
+        2.0f,                                // 缩放系数
+        glm::vec2(-0.75f, 0.11f),           // 树枝状Julia参数
+        80,                                  // 迭代次数：高精度
+        0,                                   // 漫反射材质
+        0.0f                                 // 材质参数
+    );
 
     /* ---------- 5. 打包成连续 float ---------- */
     std::vector<float> gpuData;
@@ -296,12 +277,12 @@ int main() {
     glBufferData(GL_TEXTURE_BUFFER,
                  gpuData.size() * sizeof(float),
                  gpuData.data(),
-                 GL_DYNAMIC_DRAW);              // 动态：以后可 glBufferSubData
+                 GL_DYNAMIC_DRAW);
 
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_BUFFER, tex);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, tbo);
-
+    
     /* ---------- 7. 渲染循环 ---------- */
     while (!glfwWindowShouldClose(win)) {
         /* 7-1 更新窗口尺寸 / 清屏 */
