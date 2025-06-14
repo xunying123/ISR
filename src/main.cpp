@@ -231,33 +231,46 @@ int main() {
     auto* ground = tree.create_plane({0.7f, 0.7f, 0.7f, 1.0f}, glm::vec3(0.0f, 1.0f, 0.0f), -1.0f);
     
     // 创建Menger Sponge分形 - 左侧，金色
-    auto* menger = tree.create_menger_sponge(
-        {1.0f, 0.8f, 0.3f, 1.0f},           // 颜色：金色
-        glm::vec3(-6.0f, 1.2f, 0.0f),       // 中心位置：左侧，更远
-        1.8f,                                // 大小
-        5,                                   // 迭代次数：4层精细度
-        0,                                   // 漫反射材质
-        0.0f                                 // 材质参数
-    );
+    // auto* menger = tree.create_menger_sponge(
+    //     {1.0f, 0.8f, 0.3f, 1.0f},           // 颜色：金色
+    //     glm::vec3(-6.0f, 1.2f, 0.0f),       // 中心位置：左侧，更远
+    //     1.8f,                                // 大小
+    //     5,                                   // 迭代次数：4层精细度
+    //     0,                                   // 漫反射材质
+    //     0.0f                                 // 材质参数
+    // );
     
-    // 创建Mandelbulb分形 - 中间，紫红色
-    auto* mandelbulb = tree.create_mandelbulb(
-        {1.0f, 0.3f, 0.8f, 1.0f},           // 颜色：紫红色
-        glm::vec3(0.0f, 1.0f, 0.0f),        // 中心位置：中间
-        2.2f,                                // 缩放系数：更大一点
-        8.0f,                                // Mandelbulb幂次 (经典值)
-        80,                                  // 迭代次数：更高精度
-        0,                                   // 漫反射材质
-        0.0f                                 // 材质参数
-    );
+    // // 创建Mandelbulb分形 - 中间，紫红色
+    // auto* mandelbulb = tree.create_mandelbulb(
+    //     {1.0f, 0.3f, 0.8f, 1.0f},           // 颜色：紫红色
+    //     glm::vec3(0.0f, 1.0f, 0.0f),        // 中心位置：中间
+    //     2.2f,                                // 缩放系数：更大一点
+    //     8.0f,                                // Mandelbulb幂次 (经典值)
+    //     80,                                  // 迭代次数：更高精度
+    //     0,                                   // 漫反射材质
+    //     0.0f                                 // 材质参数
+    // );
     
-    // 创建Julia Set 3D分形 - 右侧，青绿色，使用树枝状参数
-    auto* julia3d = tree.create_julia_set_3d(
-        {0.3f, 1.0f, 0.6f, 1.0f},           // 颜色：青绿色
-        glm::vec3(6.0f, 1.0f, 0.0f),        // 中心位置：右侧，更远
+    // 创建Julia Set 3D分形 - 左侧，不使用orbit trap，基础颜色
+    auto* julia3d_clean = tree.create_julia_set_3d(
+        {0.3f, 1.0f, 0.6f, 1.0f},           // 颜色：青绿色（基础颜色）
+        glm::vec3(-3.0f, 1.0f, 0.0f),       // 中心位置：左侧
         2.0f,                                // 缩放系数
         glm::vec2(-0.75f, 0.11f),           // 树枝状Julia参数
-        80,                                  // 迭代次数：高精度
+        64,                                  // 迭代次数
+        false,                               // 不使用orbit trap (保持原始颜色)
+        0,                                   // 漫反射材质
+        0.0f                                 // 材质参数
+    );
+    
+    // 创建Julia Set 3D分形 - 右侧，使用orbit trap，相同基础颜色
+    auto* julia3d_orbit = tree.create_julia_set_3d(
+        {0.3f, 1.0f, 0.6f, 1.0f},           // 颜色：相同的青绿色（会被orbit trap调制）
+        glm::vec3(3.0f, 1.0f, 0.0f),        // 中心位置：右侧
+        2.0f,                                // 缩放系数
+        glm::vec2(-0.75f, 0.11f),           // 相同的Julia参数
+        64,                                  // 迭代次数
+        true,                                // 使用orbit trap (会产生橙红色调制效果)
         0,                                   // 漫反射材质
         0.0f                                 // 材质参数
     );

@@ -204,32 +204,45 @@ float sdMandelbulb(vec3 p, vec3 center, float scale, float power, int maxIter)
     return 0.25 * log(m) * sqrt(m) / dz * scale;
 }
 
-// Julia Set 3D SDF函数 - 基于Orbit Trapping技术
-// 参考: https://iquilezles.org/articles/juliasets3d/ 和 https://iquilezles.org/articles/orbittraps3d/
-float sdJuliaSet3D(vec3 p, vec3 center, float scale, vec2 c, int maxIter)
+// --- 辅助函数：创建丰富的程序化调色板 ---
+// 基于Iñigo Quilez的技术。它使用余弦波从几个简单的参数生成平滑、复杂的渐变。
+vec3 palette( float t, vec3 a, vec3 b, vec3 c, vec3 d ) {
+    return a + b*cos( 6.28318*(c*t+d) );
+}
+
+vec4 sdJuliaSet3D_WithColor(vec3 p, vec3 center, float scale, vec2 c, int maxIter, bool useOrbitTrap, vec3 baseColor)
 {
     vec3 z = (p - center) / scale;
     float m2 = 0.0;
-    vec2 t = vec2(1e10);
-    
-    float dz = 1.0;  // 轨道导数
-    
+    float dz = 1.0;
+
+    // --- Orbit Trap 相关变量 ---
+    float trap = 1e10;
+
+    // 实际迭代次数
+    int actualIterations = 0;
+
     for(int i = 0; i < maxIter; i++)
     {
+        actualIterations = i;
         m2 = dot(z, z);
-        
-        // 逃逸条件
-        if(m2 > 4.0) break;
-        
-        // Orbit trapping - 测试与简单陷阱的距离
-        t.x = min(t.x, abs(z.y));                    // 到xz平面的距离
-        t.y = min(t.y, length(z.xz - vec2(1.0, 0.0))); // 到点(1,0)的距离
-        
-        // 计算轨道导数
+
+        if(m2 > 16.0) {
+            break;
+        }
+
+        // --- Orbit Trapping ---
+        if(useOrbitTrap) {
+            // 原始的陷阱逻辑很好，我们保留它。
+            // 它寻找轨道到原点和坐标轴的最近距离。
+            trap = min(trap, length(z));
+            trap = min(trap, min(abs(z.x), abs(z.y)));
+            trap = min(trap, abs(length(z.xy) - 1.0));
+        }
+
         dz = 2.0 * sqrt(m2) * dz + 1.0;
-        
-        // Julia集合迭代：z = z^2 + c
-        // 使用四元数形式的平方运算
+
+        // Julia 集合迭代
         float x = z.x, y = z.y, zz = z.z;
         z = vec3(
             x*x - y*y - zz*zz + c.x,
@@ -237,16 +250,53 @@ float sdJuliaSet3D(vec3 p, vec3 center, float scale, vec2 c, int maxIter)
             2.0*x*zz
         );
     }
-    
-    // 距离估计，结合orbit trapping效果
-    float d = 0.5 * sqrt(m2) * log(m2) / dz;
-    
-    // 使用orbit trap来调制距离场
-    // 这可以创建更有趣的3D Julia集合结构
-    float trap = min(t.x, t.y);
-    d = max(d, trap * 0.1);  // 混合距离场和orbit traps
-    
-    return d * scale;
+
+    // 距离估计 (这部分保持不变)
+    float d;
+    if(m2 > 16.0) {
+        d = 0.5 * sqrt(m2) * log(m2) / dz * scale;
+    } else {
+        d = -0.1 * scale;
+    }
+
+    // --- 颜色计算 ---
+    vec3 finalColor = baseColor;
+    if(useOrbitTrap) {
+        // [核心修改]
+        // 我们现在使用一种更先进的着色技术。
+        // 这包括创建平滑的度量，并用它们来驱动一个动态调色板。
+
+        // 1. 为着色创建两个平滑、连续的度量。
+        // t_iter: 代表在分形中的“深度”。这是归一化的迭代次数。
+        float t_iter = float(actualIterations) / float(maxIter);
+
+        // t_trap: 代表轨道陷阱距离。我们使用指数函数将原始的'trap'值
+        // 重新映射到一个更均匀的0-1范围。这可以防止颜色聚集，并创建更平滑的渐变。
+        float t_trap = 1.0 - exp(-1.5 * trap);
+
+        // 2. 定义我们的程序化余弦调色板的参数。
+        // 我们使用'baseColor'来影响调色板，以保留其作用。
+        vec3 pal_a = baseColor * 0.5 + 0.2; // 偏移 - 控制亮度
+        vec3 pal_b = vec3(0.5);             // 振幅 - 控制对比度
+        vec3 pal_c = vec3(1.0, 1.0, 1.0);   // 基础频率 - 控制颜色重复
+        vec3 pal_d = baseColor.yzx;         // 相位 - 调整颜色方案
+
+        // 3. 根据迭代深度调制调色板的频率。
+        // 这是使渐变在分形深处更复杂的关键。
+        // 在迭代次数少的区域（靠近边缘），渐变很简单。
+        // 在迭代次数多的区域（深入内部），渐变变得快速而细致。
+        vec3 dynamic_freq = mix(vec3(1.0), pal_c * vec3(2.0, 3.0, 4.0), t_iter);
+
+        // 4. 使用动态调色板计算最终颜色。
+        // 调色板的主要驱动力是平滑的陷阱距离(t_trap)，
+        // 但其行为通过'dynamic_freq'受到迭代深度的改变。
+        finalColor = palette(t_trap, pal_a, pal_b, dynamic_freq, pal_d);
+    }
+
+    // 将最终颜色限制在有效的0-1范围内。
+    finalColor = clamp(finalColor, 0.0, 1.0);
+
+    return vec4(finalColor, d);
 }
 
 void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top, inout int matIDStack[8], inout float matParStack[8])
@@ -437,10 +487,15 @@ void distOne(int idx, vec3 p, inout vec4 stack[8], inout int stack_top, inout in
         float scale = t2.x;             // (pos3) scale
         vec2 c_param = vec2(t2.y, t2.z); // (pos4~5) Julia参数c = c.x + c.y*i
         int maxIter = int(t2.w + 0.5);  // (pos6) 最大迭代次数
-        float texture = t3.x;           // (pos7) 材质类型
-        float para = t3.y;              // (pos8) 材质参数
+        bool orbitTrap = t3.x > 0.5;    // (pos7) orbit trap开关
+        float texture = t3.y;           // (pos8) 材质类型
+        float para = t3.z;              // (pos9) 材质参数
         
-        stack[stack_top] = vec4(curColor, sdJuliaSet3D(p, center, scale, c_param, maxIter));
+        // 每次查询都重新计算该位置的颜色和距离
+        vec4 result = sdJuliaSet3D_WithColor(p, center, scale, c_param, maxIter, orbitTrap, curColor);
+        
+        // result.xyz是动态计算的颜色，result.w是距离
+        stack[stack_top] = result;
         matIDStack[stack_top] = int(texture + 0.5);
         matParStack[stack_top] = para;
         stack_top += 1;
@@ -453,6 +508,7 @@ float map(vec3 p, out vec3 col, out int matID, out float matPar)
     int   idStack [8] = int[8](0, 0, 0, 0, 0, 0, 0, 0);
     float parStack[8] = float[8](0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     int stack_top = 0;
+    
     for (int i = 0; i < numObjects; ++i)
     {
         distOne(i, p, stack, stack_top, idStack, parStack);
@@ -465,8 +521,8 @@ float map(vec3 p, out vec3 col, out int matID, out float matPar)
 
 vec3 calcNormal(vec3 p)
 {
-    // 使用更高精度的法向量计算
-    const float h = 1e-4;  // 减小步长以提高精度
+    // 使用适合分形的精度参数
+    const float h = 5e-5;  // 适中的步长，平衡精度和性能
     vec3 dummy;
     int idDummy;
     float parDummy;
@@ -521,11 +577,11 @@ float calcAO(vec3 p, vec3 n)
 
 float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col, out int matID, out float matPar)
 {
-    const float EPS  = 8e-5;   // 更高的精度阈值
+    const float EPS  = 1e-5;   // 提高精度阈值，适合分形结构
     const float TMAX = 100.0;
     float t = 0.0;
     
-    for (int i = 0; i < 768; ++i)  // 增加最大迭代次数
+    for (int i = 0; i < 1024; ++i)  // 增加最大迭代次数
     {
         pos = ro + rd * t;
         float d = map(pos, col, matID, matPar);
@@ -533,7 +589,7 @@ float march(vec3 ro, vec3 rd, out vec3 pos, out vec3 col, out int matID, out flo
         if (d < EPS) return t;
         
         // 对于分形结构，使用更保守的步长
-        t += d * 0.8;  // 减小步长因子，提高精度
+        t += d * 0.7;  // 进一步减小步长因子，提高精度
         
         if (t > TMAX) break;
     }

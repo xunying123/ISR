@@ -210,14 +210,15 @@ namespace Objects {
 
     Object *CSG_tree::create_julia_set_3d(Color color, glm::vec3 center, float scale, 
                                           glm::vec2 c_param, int max_iterations, 
-                                          float texture, float para) {
-        // 参数布局：center(3), scale(1), c_param(2), max_iterations(1), texture(1), para(1)
+                                          bool orbit_trap, float texture, float para) {
+        // 参数布局：center(3), scale(1), c_param(2), max_iterations(1), orbit_trap(1), texture(1), para(1)
         auto *julia = new Object(JULIA_SET_3D, color, {
             center.x, center.y, center.z,      // 0,1,2: center
             scale,                              // 3: scale  
             c_param.x, c_param.y,              // 4,5: Julia参数c = c.x + c.y*i
             static_cast<float>(max_iterations), // 6: 最大迭代次数
-            texture, para                       // 7,8: 材质参数
+            orbit_trap ? 1.0f : 0.0f,          // 7: orbit trap开关 (1.0=开启，0.0=关闭)
+            texture, para                       // 8,9: 材质参数
         });
         object_list.push_back(julia);
         return julia;

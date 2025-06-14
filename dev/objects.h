@@ -95,7 +95,7 @@ namespace Objects {
 
         Object *create_julia_set_3d(Color color, glm::vec3 center, float scale, 
                                     glm::vec2 c_param, int max_iterations = 64, 
-                                    float texture = 0, float para = 0.0f);
+                                    bool orbit_trap = false, float texture = 0, float para = 0.0f);
 
         Object *create_intersection(Object *left, Object *right);
 
